@@ -1,0 +1,33 @@
+{
+  "name": "Atbash Sandbox",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "args": {
+      "ATBASH_CLI_VERSION": "0.3.18"
+    }
+  },
+  "remoteUser": "atbash",
+  "containerUser": "atbash",
+  "updateRemoteUserUID": false,
+
+  "workspaceMount": "type=volume,source=atbash-workspace,target=/workspace",
+  "workspaceFolder": "/workspace",
+  "mounts": [],
+
+  "containerEnv": {
+    "ATBASH_AGENT_KEY": "${localEnv:ATBASH_AGENT_KEY}",
+    "ATBASH_ORG_NAME":  "${localEnv:ATBASH_ORG_NAME}"
+  },
+  "remoteEnv": {
+    "ATBASH_AGENT_KEY": "${localEnv:ATBASH_AGENT_KEY}",
+    "ATBASH_ORG_NAME":  "${localEnv:ATBASH_ORG_NAME}"
+  },
+
+  "runArgs": [
+    "--cap-drop=ALL",
+    "--security-opt=no-new-privileges:true"
+  ],
+
+  "postCreateCommand": "chmod 600 /home/atbash/.config/atbash/telemetry.json && atbash --version",
+  "postAttachCommand": "echo 'Atbash sandbox ready. Try: atbash judge \\'{\"action\":\"list_dir\",\"path\":\".\"}\\''"
+}

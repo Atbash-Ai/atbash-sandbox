@@ -1,9 +1,53 @@
+# Atbash sandbox — local Docker Compose entrypoint.
+#
+# Quick start:
+#   docker compose run --rm atbash
+#
+# The entrypoint will generate an agent keypair on first run and print the
+# public key. Onboard the agent at https://atbash.ai/ and you're ready.
+#
+# Optional: drop credentials in .env if you already have them.
+#   cp .env.example .env
+#
+# Security posture (see docs/security-posture.md for the full rationale):
+#   - non-root (uid 10001, set in Dockerfile)
+#   - read-only root filesystem; tmpfs for ~/.config/atbash and /tmp
+#   - no host bind-mounts
+#   - all Linux capabilities dropped
+#   - no-new-privileges enforced
+#   - secrets pulled from .env if present; never baked into the image
+
 services:
   atbash:
-    build: .
+    build:
+      context: .
+      args:
+        ATBASH_CLI_VERSION: "0.3.18"
+    image: atbash-sandbox:local
     stdin_open: true
     tty: true
-    # No host mounts — isolated environment
-    # No local secrets — keys generated inside container
+    init: true
+
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+    # Writable scratch space. Compose tmpfs mounts can't preserve file mode
+    # for non-root users on every Docker version, so we keep the syntax
+    # minimal and let the entrypoint re-apply 0700/0600 on each boot.
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /home/atbash/.config/atbash:size=8m,uid=10001,gid=10001,mode=0700
+      - /home/atbash/.cache:size=32m,uid=10001,gid=10001,mode=0700
+
     environment:
-      - NODE_ENV=production
+      # All optional — entrypoint.sh generates a key on first run if none.
+      ATBASH_AGENT_KEY:        "${ATBASH_AGENT_KEY:-}"
+      ATBASH_ORG_NAME:         "${ATBASH_ORG_NAME:-}"
+      ATBASH_ENDPOINT:         "${ATBASH_ENDPOINT:-}"
+      ATBASH_BLOCKCHAIN_RID:   "${ATBASH_BLOCKCHAIN_RID:-}"
+      ATBASH_PROVIDER:         "${ATBASH_PROVIDER:-}"
+      ATBASH_PROVIDER_MODEL:   "${ATBASH_PROVIDER_MODEL:-}"
+      NODE_ENV: production
