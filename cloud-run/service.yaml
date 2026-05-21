@@ -1,0 +1,50 @@
+# Cloud Run service spec for the Atbash sandbox.
+#
+# Apply with:
+#   gcloud run services replace cloud-run/service.yaml --region=us-central1
+#
+# The image referenced here is built by cloud-run/cloudbuild.yaml. Replace
+# PROJECT_ID before deploying.
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: atbash-sandbox
+  annotations:
+    run.googleapis.com/ingress: internal
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "1"
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      serviceAccountName: atbash-sandbox-sa
+      containerConcurrency: 1
+      timeoutSeconds: 900
+      containers:
+        - image: gcr.io/PROJECT_ID/atbash-sandbox:0.3.18
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          env:
+            - name: ATBASH_AGENT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: atbash-agent-key
+                  key: latest
+            - name: ATBASH_ORG_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: atbash-org-name
+                  key: latest

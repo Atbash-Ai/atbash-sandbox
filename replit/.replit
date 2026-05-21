@@ -1,0 +1,17 @@
+run = "bash -lc 'atbash --version && bash -i'"
+entrypoint = "README.md"
+
+[nix]
+channel = "stable-24_05"
+
+[env]
+PATH = "/home/runner/.npm-global/bin:/home/runner/$REPL_SLUG/.config/atbash:$PATH"
+
+[gitHubImport]
+requiredFiles = [".replit", "replit/replit.nix"]
+
+[unitTest]
+language = "bash"
+
+[deployment]
+deploymentTarget = "static"

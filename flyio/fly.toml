@@ -1,0 +1,33 @@
+# fly.toml — Atbash sandbox on Fly.io
+#
+# Deploy:
+#   fly launch --copy-config --no-deploy --name <your-name>
+#   fly secrets set ATBASH_AGENT_KEY=... ATBASH_ORG_NAME=...
+#   fly deploy
+#   fly ssh console
+#
+# This config runs a single, idle Machine with no public ports. Interaction
+# is via `fly ssh console` — there is nothing to expose to the internet.
+
+app = "atbash-sandbox"
+primary_region = "ams"
+
+[build]
+  dockerfile = "../Dockerfile"
+
+[env]
+  # Non-secret defaults only. Secrets go via `fly secrets set`.
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+  cpus = 1
+
+[experimental]
+  auto_rollback = true
+
+# No [[services]] block on purpose — sandbox is shell-only, no HTTP.
+# No [mounts] block on purpose — no persistent volume, no host filesystem.
+
+[processes]
+  app = "tail -f /dev/null"
