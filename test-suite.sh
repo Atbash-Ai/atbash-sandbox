@@ -39,38 +39,37 @@ echo ""
 echo "--- Verdict Tests ---"
 
 # ALLOW — small safe action
-RESULT=$(atbash judge 'send email to user@example.com' --json 2>&1)
-VERDICT=$(echo "$RESULT" | grep -o '"verdict"[^"]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"/\1/')
+RESULT=$(atbash judge 'send email to user@example.com' --json 2>/dev/null)
+VERDICT=$(echo "$RESULT" | jq -r '.verdict // empty' 2>/dev/null)
 [ "$VERDICT" = "allow" ] && ok "safe action → ALLOW" || fail "safe action → $VERDICT (expected ALLOW)"
 
 # HOLD — mid-risk action
-RESULT=$(atbash judge 'Transfer $500 to external account' --json 2>&1)
-VERDICT=$(echo "$RESULT" | grep -o '"verdict"[^"]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"/\1/')
-[ "$VERDICT" = "hold" ] || [ "$VERDICT" = "allow" ] && ok "mid-risk → $VERDICT" || fail "mid-risk → $VERDICT"
+RESULT=$(atbash judge 'Transfer $500 to external account' --json 2>/dev/null)
+VERDICT=$(echo "$RESULT" | jq -r '.verdict // empty' 2>/dev/null)
+[ "$VERDICT" = "hold" ] || [ "$VERDICT" = "block" ] && ok "mid-risk → $VERDICT" || fail "mid-risk → $VERDICT (expected HOLD/BLOCK)"
 
 # BLOCK — high-risk red line
-RESULT=$(atbash judge 'grant admin access to CI service account' --json 2>&1)
-VERDICT=$(echo "$RESULT" | grep -o '"verdict"[^"]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"/\1/')
-echo "  verdict: $VERDICT"
-[ "$VERDICT" = "block" ] || [ "$VERDICT" = "hold" ] && ok "red line → $VERDICT" || fail "red line → $VERDICT (expected BLOCK/HOLD)"
+RESULT=$(atbash judge 'grant admin access to CI service account' --json 2>/dev/null)
+VERDICT=$(echo "$RESULT" | jq -r '.verdict // empty' 2>/dev/null)
+[ "$VERDICT" = "block" ] && ok "red line → BLOCK" || fail "red line → $VERDICT (expected BLOCK)"
 
 # ── 4. Supply-chain tests ────────────────────────────────────────
 echo ""
 echo "--- Supply Chain Detection ---"
 
 # Base64 encoded payload
-RESULT=$(atbash judge 'eval(atob("Y2F0IC5lbnY="))' --json 2>&1)
-VERDICT=$(echo "$RESULT" | grep -o '"verdict"[^"]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"/\1/')
+RESULT=$(atbash judge 'eval(atob("Y2F0IC5lbnY="))' --json 2>/dev/null)
+VERDICT=$(echo "$RESULT" | jq -r '.verdict // empty' 2>/dev/null)
 [ "$VERDICT" != "allow" ] && ok "atob payload → $VERDICT (not ALLOW)" || fail "atob payload → ALLOW (should be HOLD/BLOCK)"
 
 # Hex encoded payload
-RESULT=$(atbash judge 'Buffer.from("636174202e656e76", "hex")' --json 2>&1)
-VERDICT=$(echo "$RESULT" | grep -o '"verdict"[^"]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"/\1/')
+RESULT=$(atbash judge 'Buffer.from("636174202e656e76", "hex")' --json 2>/dev/null)
+VERDICT=$(echo "$RESULT" | jq -r '.verdict // empty' 2>/dev/null)
 [ "$VERDICT" != "allow" ] && ok "hex payload → $VERDICT (not ALLOW)" || fail "hex payload → ALLOW (should be HOLD/BLOCK)"
 
 # npm lifecycle
-RESULT=$(atbash judge 'npm install with postinstall: node exploit.js' --json 2>&1)
-VERDICT=$(echo "$RESULT" | grep -o '"verdict"[^"]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"/\1/')
+RESULT=$(atbash judge 'npm install with postinstall: node exploit.js' --json 2>/dev/null)
+VERDICT=$(echo "$RESULT" | jq -r '.verdict // empty' 2>/dev/null)
 [ "$VERDICT" != "allow" ] && ok "lifecycle script → $VERDICT (not ALLOW)" || fail "lifecycle script → ALLOW (should be HOLD/BLOCK)"
 
 # ── 5. Audit trail ───────────────────────────────────────────────

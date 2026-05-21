@@ -1,4 +1,4 @@
-run = "bash -lc 'atbash --version && bash -i'"
+run = "bash -lc 'npm install -g @atbash/cli@latest && atbash --version && bash -i'"
 entrypoint = "README.md"
 
 [nix]
