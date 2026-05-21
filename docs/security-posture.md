@@ -20,7 +20,7 @@ version), defending against a malicious cloud provider.
 ### Process identity
 
 - Container runs as UID/GID **10001**, not root.
-- Implemented in the Dockerfile via `useradd --system --uid 10001 atbash` +
+- Implemented in the Dockerfile via `adduser -D -u 10001 -h /home/atbash atbash` +
   `USER atbash`.
 - Enforced platform-by-platform:
   - Cloud Run: `securityContext.runAsNonRoot: true`, `runAsUser: 10001`.
@@ -82,15 +82,15 @@ version), defending against a malicious cloud provider.
 
 ### Supply chain
 
-- The base image is `node:20-bookworm-slim`, a Debian-based image pinned to
-  Node 20 and refreshed by upstream.
+- The base image is `node:22-alpine`, an Alpine-based image pinned to
+  Node 22 and refreshed by upstream.
 - The atbash CLI is pinned to `@atbash/cli@0.3.18` via the
   `ATBASH_CLI_VERSION` build arg. Bumps are intentional, not implicit.
 - `npm install` is run with `--no-audit --no-fund --no-update-notifier` to
   avoid noisy egress at build time. Audit is run separately if desired
   (`npm audit --omit=dev` inside the container).
 - No third-party shell scripts are piped from `curl`. The Dockerfile's
-  `apt-get` packages are the only network reach during build.
+  `apk add` packages are the only network reach during build.
 
 ## Verifying the posture for yourself
 
