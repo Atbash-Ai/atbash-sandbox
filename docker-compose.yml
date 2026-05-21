@@ -1,0 +1,9 @@
+services:
+  atbash:
+    build: .
+    stdin_open: true
+    tty: true
+    # No host mounts — isolated environment
+    # No local secrets — keys generated inside container
+    environment:
+      - NODE_ENV=production
