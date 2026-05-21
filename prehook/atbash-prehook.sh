@@ -32,16 +32,17 @@ atbash_prehook() {
   verdict=$(atbash judge "$payload" --json 2>/dev/null | jq -r '.verdict // "ERROR"')
   _ATBASH_PREHOOK_GUARD=0
 
+  # API returns lowercase verdicts (allow/hold/block)
   case "$verdict" in
-    ALLOW)
+    allow|ALLOW)
       return 0
       ;;
-    HOLD)
+    hold|HOLD)
       printf 'atbash prehook: \033[33mHELD\033[0m — awaiting operator review at https://atbash.ai/held\n' >&2
       printf '   command: %s\n' "$cmd" >&2
       return 1
       ;;
-    BLOCK)
+    block|BLOCK)
       printf 'atbash prehook: \033[31mBLOCKED\033[0m by policy\n' >&2
       printf '   command: %s\n' "$cmd" >&2
       return 1
