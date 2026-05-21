@@ -66,7 +66,14 @@ same hardened root [`Dockerfile`](./Dockerfile).
 | **[Replit](replit/README.md)**                  | — | Import from GitHub  | Beginner, in-browser |
 | **[Google Cloud Run](cloud-run/README.md)**     | — | `gcloud builds submit`  | GCP-native, internal-only |
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Atbash-Ai/atbash-quickstart)
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Atbash-Ai/atbash-sandbox)
+
+> Codespaces uses a separate, lighter config — see [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json).
+> It installs `@atbash/cli` on top of Microsoft's Node 22 devcontainer base
+> (not our hardened Dockerfile) because Codespaces injects its own `vscode`
+> user into whichever image you start with — incompatible with a hardened
+> image that only defines a non-root `atbash` user. The full hardening still
+> applies to every other deploy target (Compose, Fly.io, Render, Cloud Run).
 
 ## Try the prehook (opt-in)
 
@@ -113,8 +120,8 @@ Deeper: [`docs/how-to-test-safely.md`](docs/how-to-test-safely.md).
 |---|---|
 | Non-root user (uid 10001)               | Dockerfile + every platform manifest |
 | Read-only root FS, tmpfs scratch        | docker-compose.yml + Cloud Run securityContext |
-| Drop all Linux capabilities             | docker-compose.yml + devcontainer + Cloud Run |
-| `no-new-privileges`                     | docker-compose.yml + devcontainer + Cloud Run |
+| Drop all Linux capabilities             | docker-compose.yml + Cloud Run |
+| `no-new-privileges`                     | docker-compose.yml + Cloud Run |
 | `~/.config/atbash/*.json` mode 0600     | entrypoint.sh on every boot |
 | Secrets via platform store only         | every platform README |
 | Pinned `@atbash/cli@0.3.18`             | Dockerfile `ARG ATBASH_CLI_VERSION` |
