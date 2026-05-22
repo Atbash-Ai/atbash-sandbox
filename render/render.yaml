@@ -9,6 +9,6 @@ services:
   - type: pserv
     name: atbash-sandbox
     runtime: docker
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ../Dockerfile
     plan: free
     autoDeploy: false
