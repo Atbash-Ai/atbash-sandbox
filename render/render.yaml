@@ -12,16 +12,3 @@ services:
     dockerfilePath: ../Dockerfile
     plan: free
     autoDeploy: false
-    envVars:
-      - key: ATBASH_AGENT_KEY
-        sync: false
-      - key: ATBASH_ORG_NAME
-        sync: false
-      - key: ATBASH_ENDPOINT
-        sync: false
-      - key: ATBASH_BLOCKCHAIN_RID
-        sync: false
-      - key: ATBASH_PROVIDER
-        sync: false
-      - key: ATBASH_PROVIDER_MODEL
-        sync: false
