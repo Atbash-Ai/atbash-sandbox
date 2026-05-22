@@ -124,7 +124,7 @@ Deeper: [`docs/how-to-test-safely.md`](docs/how-to-test-safely.md).
 | `no-new-privileges`                     | docker-compose.yml + Cloud Run |
 | `~/.config/atbash/*.json` mode 0600     | entrypoint.sh on every boot |
 | Secrets via platform store only         | every platform README |
-| Pinned `@atbash/cli@0.3.18`             | Dockerfile `ARG ATBASH_CLI_VERSION` |
+| `@atbash/cli@latest` by default          | Dockerfile `ARG ATBASH_CLI_VERSION` (pin with `--build-arg`) |
 
 Full breakdown and how to verify it: [`docs/security-posture.md`](docs/security-posture.md).
 

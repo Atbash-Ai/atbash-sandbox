@@ -38,7 +38,7 @@ atbash judge '{"action":"list_dir","path":"."}'
 | No host mounts           | No `[mounts]` section in `fly.toml`; no host filesystem accessible.       |
 | No local secrets         | `fly secrets set` stores them in Fly's secret store, injected as env at runtime. |
 | No public ports          | No `[[services]]` block in `fly.toml` — VM has no inbound network surface. |
-| Pinned CLI version       | `ATBASH_CLI_VERSION` build arg in the Dockerfile (currently `0.3.18`).    |
+| Pinned CLI version       | `ATBASH_CLI_VERSION` build arg in the Dockerfile (currently `latest`).    |
 
 ## Teardown
 

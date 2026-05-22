@@ -27,7 +27,7 @@
 
   // Install the CLI, seed the telemetry opt-out file, and verify the version
   // matches the pin. Runs once after the container is created.
-  "postCreateCommand": "sudo npm install -g @atbash/cli@0.3.18 && mkdir -p $HOME/.config/atbash && cp ${containerWorkspaceFolder}/telemetry/telemetry.json $HOME/.config/atbash/telemetry.json && chmod 0700 $HOME/.config/atbash && chmod 0600 $HOME/.config/atbash/telemetry.json && atbash --version",
+  "postCreateCommand": "sudo npm install -g @atbash/cli@latest && mkdir -p $HOME/.config/atbash && cp ${containerWorkspaceFolder}/telemetry/telemetry.json $HOME/.config/atbash/telemetry.json && chmod 0700 $HOME/.config/atbash && chmod 0600 $HOME/.config/atbash/telemetry.json && atbash --version",
 
   "postAttachCommand": "echo 'Atbash sandbox ready. Detailed tests at tests/run-all.sh, smoke test at ./test-suite.sh. Set ATBASH_AGENT_KEY and ATBASH_ORG_NAME before running.'"
 }

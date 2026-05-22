@@ -22,7 +22,7 @@ services:
     build:
       context: .
       args:
-        ATBASH_CLI_VERSION: "0.3.18"
+        ATBASH_CLI_VERSION: "latest"
     image: atbash-sandbox:local
     stdin_open: true
     tty: true

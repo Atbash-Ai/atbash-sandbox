@@ -84,7 +84,7 @@ version), defending against a malicious cloud provider.
 
 - The base image is `node:22-alpine`, an Alpine-based image pinned to
   Node 22 and refreshed by upstream.
-- The atbash CLI is pinned to `@atbash/cli@0.3.18` via the
+- The atbash CLI is pinned to `@atbash/cli@latest` via the
   `ATBASH_CLI_VERSION` build arg. Bumps are intentional, not implicit.
 - `npm install` is run with `--no-audit --no-fund --no-update-notifier` to
   avoid noisy egress at build time. Audit is run separately if desired
@@ -104,7 +104,7 @@ ls -l  ~/.config/atbash/telemetry.json          # -rw------- atbash atbash
 cat /proc/1/status | grep NoNewPrivs            # NoNewPrivs: 1
 capsh --print 2>/dev/null || grep CapEff /proc/self/status   # all dropped
 touch /etc/test 2>&1                            # read-only: should fail
-atbash --version                                # @atbash/cli@0.3.18
+atbash --version                                # @atbash/cli@latest
 docker history atbash-sandbox:local             # no plaintext secrets
 ```
 

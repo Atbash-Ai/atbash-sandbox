@@ -29,7 +29,7 @@ atbash judge '{"action":"list_dir","path":"."}'
 | No host mounts           | No `disk:` section in `render.yaml` — no persistent volume.               |
 | No local secrets         | All env vars marked `sync: false` so the blueprint stores names only.     |
 | No public network        | `type: pserv` (private service) — no inbound HTTP.                        |
-| Pinned CLI version       | `ATBASH_CLI_VERSION` build arg in the Dockerfile (currently `0.3.18`).    |
+| Pinned CLI version       | `ATBASH_CLI_VERSION` build arg in the Dockerfile (currently `latest`).    |
 
 ## Teardown
 

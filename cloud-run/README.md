@@ -33,7 +33,7 @@ for s in atbash-agent-key atbash-org-name; do
 done
 
 # 4. Build the image.
-gcloud builds submit --config cloud-run/cloudbuild.yaml --substitutions=_VERSION=0.3.18 .
+gcloud builds submit --config cloud-run/cloudbuild.yaml --substitutions=_VERSION=latest .
 
 # 5. Replace PROJECT_ID in the service spec and deploy.
 sed "s/PROJECT_ID/${PROJECT_ID}/" cloud-run/service.yaml | \
@@ -58,7 +58,7 @@ gcloud run services execute atbash-sandbox --region="$REGION" --command="bash -i
 | Drop capabilities        | `capabilities.drop: [ALL]`.                                               |
 | No privilege escalation  | `allowPrivilegeEscalation: false`.                                        |
 | Internal ingress only    | `run.googleapis.com/ingress: internal` — no public URL.                   |
-| Pinned CLI version       | Image tag is `:0.3.18`; bump explicitly.                                  |
+| Pinned CLI version       | Image tag is `:latest`; bump explicitly.                                  |
 
 ## Teardown
 

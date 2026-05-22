@@ -24,7 +24,7 @@ spec:
       containerConcurrency: 1
       timeoutSeconds: 900
       containers:
-        - image: gcr.io/PROJECT_ID/atbash-sandbox:0.3.18
+        - image: gcr.io/PROJECT_ID/atbash-sandbox:latest
           securityContext:
             runAsNonRoot: true
             runAsUser: 10001
