@@ -41,7 +41,7 @@ jobs:
           docker run --rm \
             -v "$PWD:/repo:ro" \
             zricethezav/gitleaks:v8.30.1 \
-            git --source=/repo --no-banner --redact
+            git --no-banner --redact /repo
       - name: Prehook red-team unit suite
         run: bash tests/prehook-unit.sh
 
