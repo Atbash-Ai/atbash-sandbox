@@ -61,11 +61,6 @@ jobs:
             ! command -v npx
             test "$(atbash --version)" = 0.5.8
             test -z "$(find / -xdev -type f \( -perm -4000 -o -perm -2000 \) -print -quit 2>/dev/null)"
-            test "$(stat -c %U /opt/atbash/prehook/atbash-prehook.sh)" = root
-            test "$(stat -c %U /opt/atbash/tests/run-all.sh)" = root
-            test "$(stat -c %U /home/atbash/entrypoint.sh)" = root
-            ! test -w /opt/atbash/prehook/atbash-prehook.sh
-            ! test -w /opt/atbash/tests/run-all.sh
           '
           docker run --rm \
             --read-only \
@@ -96,6 +91,20 @@ jobs:
             printf "#!/bin/sh\necho FORGED\n" > "$tmp/node"
             chmod +x "$tmp/node"
             test "$(PATH="$tmp:$PATH" atbash --version)" = 0.5.8
+          '
+      - name: Script immutability assertions
+        run: |
+          docker run --rm --entrypoint sh atbash-sandbox:test -c '
+            set -eu
+            test "$(stat -c %U /opt/atbash/prehook/atbash-prehook.sh)" = root
+            test "$(stat -c %U /opt/atbash/tests/allow.sh)" = root
+            test "$(stat -c %U /home/atbash/entrypoint.sh)" = root
+            test "$(stat -c %U /usr/local/bin/atbash-safe)" = root
+            echo "# tampered" >> /opt/atbash/prehook/atbash-prehook.sh 2>/dev/null && exit 1 || true
+            echo "# tampered" >> /opt/atbash/tests/allow.sh 2>/dev/null && exit 1 || true
+            echo "# tampered" >> /home/atbash/entrypoint.sh 2>/dev/null && exit 1 || true
+            echo "# tampered" >> /usr/local/bin/atbash-safe 2>/dev/null && exit 1 || true
+            echo script-immutability-pass
           '
       - name: Scan image
         uses: aquasecurity/trivy-action@0.35.0
