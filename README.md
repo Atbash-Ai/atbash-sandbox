@@ -114,6 +114,18 @@ off by default.
 
 Deeper: [`docs/how-to-test-safely.md`](docs/how-to-test-safely.md).
 
+## Reference architectures
+
+- [Decentralized agent containment with an Atbash-backed ledger](docs/decentralized-agent-sandbox.md) —
+  explains why the ledger and execution sandbox must remain independent security
+  boundaries, and defines a microVM, execution-broker, quorum-ledger build plan.
+- [Customs crypto intelligence agent](docs/customs-crypto-intelligence-architecture.md) —
+  an evidence-first architecture for authorized AML, terrorist-financing,
+  narcotics, and wallet-attribution investigations, with Atbash enforced at an
+  out-of-process tool execution broker and the complete platform deployed on
+  Customs-controlled on-premises infrastructure. A runnable first security
+  boundary is in [`pilot/`](pilot/README.md).
+
 ## Security posture (at a glance)
 
 | Control | Where |
@@ -124,7 +136,7 @@ Deeper: [`docs/how-to-test-safely.md`](docs/how-to-test-safely.md).
 | `no-new-privileges`                     | docker-compose.yml + Cloud Run |
 | `~/.config/atbash/*.json` mode 0600     | entrypoint.sh on every boot |
 | Secrets via platform store only         | every platform README |
-| `@atbash/cli@latest` by default          | Dockerfile `ARG ATBASH_CLI_VERSION` (pin with `--build-arg`) |
+| `@atbash/cli@0.5.8`                      | Dockerfile `ARG ATBASH_CLI_VERSION` (exact version) |
 
 Full breakdown and how to verify it: [`docs/security-posture.md`](docs/security-posture.md).
 

@@ -1,0 +1,94 @@
+name: Security checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  static-and-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject CRLF shell scripts
+        run: '! grep -Il $''\r'' $(git ls-files ''*.sh'') | grep .'
+      - name: Shell syntax
+        run: |
+          for file in $(git ls-files '*.sh'); do
+            bash -n "$file"
+          done
+      - name: ShellCheck
+        run: shellcheck -x $(git ls-files '*.sh')
+      - name: Unit tests
+        run: |
+          bash tests/prehook-unit.sh
+          bash tests/entrypoint-unit.sh
+      - name: Validate Compose
+        run: docker compose config --quiet
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Prehook red-team unit suite
+        run: bash tests/prehook-unit.sh
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: docker build --pull=false -t atbash-sandbox:test .
+      - name: Inspect non-root image user
+        run: test "$(docker inspect atbash-sandbox:test --format '{{.Config.User}}')" = atbash
+      - name: Runtime hardening assertions
+        run: |
+          docker run --rm --entrypoint sh atbash-sandbox:test -c '
+            set -eu
+            ! command -v npm
+            ! command -v npx
+            test "$(atbash --version)" = 0.5.8
+            test -z "$(find / -xdev -type f \( -perm -4000 -o -perm -2000 \) -print -quit 2>/dev/null)"
+          '
+          docker run --rm \
+            --read-only \
+            --cap-drop=ALL \
+            --security-opt=no-new-privileges \
+            --pids-limit=128 \
+            --memory=256m \
+            --cpus=1 \
+            --tmpfs /tmp:size=64m,mode=1777 \
+            --tmpfs /home/atbash/.config/atbash:size=8m,uid=10001,gid=10001,mode=0700 \
+            -e ATBASH_AGENT_KEY=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+            atbash-sandbox:test sh -c '
+              set -eu
+              test -z "${ATBASH_AGENT_KEY+x}"
+              test "$(id -u)" = 10001
+              grep -q "NoNewPrivs:[[:space:]]*1" /proc/self/status
+              test "$(awk "/CapEff/ {print \$2}" /proc/self/status)" = 0000000000000000
+              ! touch /etc/redteam-test 2>/dev/null
+              test "$(stat -c %a "$HOME/.config/atbash/config.json")" = 600
+            '
+      - name: Node injection defenses
+        run: |
+          docker run --rm --entrypoint bash atbash-sandbox:test -lc '
+            set -eu
+            tmp=$(mktemp -d)
+            printf "console.log(\"FORGED\"); process.exit(0)\n" > "$tmp/forge.js"
+            test "$(NODE_OPTIONS="--require=$tmp/forge.js" atbash --version)" = 0.5.8
+            printf "#!/bin/sh\necho FORGED\n" > "$tmp/node"
+            chmod +x "$tmp/node"
+            test "$(PATH="$tmp:$PATH" atbash --version)" = 0.5.8
+          '
+      - name: Scan image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: atbash-sandbox:test
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL

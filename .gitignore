@@ -5,6 +5,10 @@
 node_modules/
 dist/
 build/
+.research-atbash/
+.hermes-*/
+.hermes-*.json
+.hermes-tmp.*
 
 .DS_Store
 *.log

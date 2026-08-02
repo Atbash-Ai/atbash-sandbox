@@ -3,15 +3,19 @@ steps:
     args:
       - build
       - "-t"
-      - "gcr.io/$PROJECT_ID/atbash-sandbox:latest"
+      - "gcr.io/$PROJECT_ID/atbash-sandbox:${_IMAGE_TAG}"
       - "--build-arg"
-      - "ATBASH_CLI_VERSION=latest"
+      - "ATBASH_CLI_VERSION=${_CLI_VERSION}"
       - "."
   - name: gcr.io/cloud-builders/docker
-    args: ["push", "gcr.io/$PROJECT_ID/atbash-sandbox:latest"]
+    args: ["push", "gcr.io/$PROJECT_ID/atbash-sandbox:${_IMAGE_TAG}"]
 
 images:
-  - "gcr.io/$PROJECT_ID/atbash-sandbox:latest"
+  - "gcr.io/$PROJECT_ID/atbash-sandbox:${_IMAGE_TAG}"
+
+substitutions:
+  _CLI_VERSION: "0.5.8"
+  _IMAGE_TAG: "manual"
 
 options:
   logging: CLOUD_LOGGING_ONLY

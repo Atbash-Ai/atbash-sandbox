@@ -1,0 +1,11 @@
+# Require designated security/platform review for enforcement and deployment
+# surfaces.
+Dockerfile                          @tewmih @amanuelmandefrow123
+docker-compose.yml                  @tewmih @amanuelmandefrow123
+/prehook/                           @tewmih @amanuelmandefrow123
+/.github/workflows/                 @tewmih @amanuelmandefrow123
+/.devcontainer/                     @tewmih @amanuelmandefrow123
+/cloud-run/                         @tewmih @amanuelmandefrow123
+/flyio/                             @tewmih @amanuelmandefrow123
+/render/                            @tewmih @amanuelmandefrow123
+/replit/                            @tewmih @amanuelmandefrow123

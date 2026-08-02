@@ -19,12 +19,13 @@ spec:
         autoscaling.knative.dev/minScale: "0"
         autoscaling.knative.dev/maxScale: "1"
         run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/vpc-access-egress: private-ranges-only
     spec:
       serviceAccountName: atbash-sandbox-sa
       containerConcurrency: 1
       timeoutSeconds: 900
       containers:
-        - image: gcr.io/PROJECT_ID/atbash-sandbox:latest
+        - image: gcr.io/PROJECT_ID/atbash-sandbox:IMAGE_TAG
           securityContext:
             runAsNonRoot: true
             runAsUser: 10001

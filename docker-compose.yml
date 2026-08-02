@@ -22,7 +22,7 @@ services:
     build:
       context: .
       args:
-        ATBASH_CLI_VERSION: "latest"
+        ATBASH_CLI_VERSION: "0.5.8"
     image: atbash-sandbox:local
     stdin_open: true
     tty: true
@@ -33,6 +33,9 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 256m
+    cpus: 1.0
 
     # Writable scratch space. Compose tmpfs mounts can't preserve file mode
     # for non-root users on every Docker version, so we keep the syntax

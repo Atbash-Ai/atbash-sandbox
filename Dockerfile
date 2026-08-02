@@ -6,26 +6,44 @@
 # Or with docker-compose (recommended — adds read-only FS, cap_drop, etc.):
 #   docker compose run --rm atbash
 
-FROM node:22-alpine
+FROM node:22-bookworm-slim@sha256:f32b81066cde10a75dbac96646099533316d94bac4150c55da1636e1f0ffdc46
 
-ARG ATBASH_CLI_VERSION=latest
+ARG ATBASH_CLI_VERSION=0.5.8
+ARG ATBASH_CLI_INTEGRITY=sha512-PFJiDgtAzdHb7QNMdc78dyhkH70yo2CutSUOyXHS8F1+eCUJNPJBNaEEamd7eo5/4srSjFnZV/6M6LFzdrQ6rA==
+ARG NPM_VERSION=12.0.2
 
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_AUDIT=false
 
-# bash for the opt-in prehook (DEBUG trap is bash-specific);
-# tini for PID-1 signal handling; jq is handy for parsing judge JSON output.
-RUN apk add --no-cache bash tini jq ca-certificates
+# bash for the opt-in prehook (DEBUG trap is bash-specific); tini for PID-1
+# signal handling; jq is used for strict judge/config JSON parsing.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends bash tini jq ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# A patched npm is used only as a build tool. It is removed after the verified
+# CLI installation so package-management internals do not remain in the
+# runtime attack surface.
+RUN npm install -g "npm@${NPM_VERSION}" \
+ && npm --version
 
 # Non-root user (reviewer requirement). Explicit UID so platform manifests
 # (Cloud Run securityContext, devcontainer runArgs) can reference it.
-RUN adduser -D -u 10001 -h /home/atbash atbash
+RUN useradd --uid 10001 --create-home --home-dir /home/atbash --shell /bin/bash atbash
 
-# Install the CLI globally — pinned version, not @latest.
-RUN npm install -g "@atbash/cli@${ATBASH_CLI_VERSION}" \
+# Install the exact CLI release and verify the registry's expected integrity
+# before npm executes any package lifecycle scripts.
+RUN npm pack "@atbash/cli@${ATBASH_CLI_VERSION}" --silent \
+ && TARBALL="atbash-cli-${ATBASH_CLI_VERSION}.tgz" \
+ && ACTUAL_INTEGRITY="$(node -e "const fs=require('fs'),c=require('crypto');process.stdout.write('sha512-'+c.createHash('sha512').update(fs.readFileSync(process.argv[1])).digest('base64'))" "$TARBALL")" \
+ && test "$ACTUAL_INTEGRITY" = "$ATBASH_CLI_INTEGRITY" \
+ && npm install -g --ignore-scripts "./$TARBALL" \
+ && rm -f "$TARBALL" \
  && npm cache clean --force \
- && atbash --version
+ && atbash --version \
+ && rm -rf /usr/local/lib/node_modules/npm \
+ && rm -f /usr/local/bin/npm /usr/local/bin/npx
 
 USER atbash
 WORKDIR /home/atbash
@@ -55,11 +73,18 @@ COPY --chown=atbash:atbash tests/ /opt/atbash/tests/
 # Opt-in shell-level prehook demonstration (DEBUG trap pattern).
 COPY --chown=atbash:atbash prehook/ /opt/atbash/prehook/
 
+# Hardened CLI launcher: fixed Node path and NODE_OPTIONS/NODE_PATH removal.
+COPY --chown=root:root atbash-safe /usr/local/bin/atbash-safe
+
 USER root
 RUN chmod 0755 /home/atbash/entrypoint.sh /home/atbash/test-suite.sh \
                /opt/atbash/tests/*.sh /opt/atbash/tests/supply-chain/*.sh \
-               /opt/atbash/prehook/*.sh
+               /opt/atbash/prehook/*.sh /usr/local/bin/atbash-safe \
+ && ln -sf /usr/local/bin/atbash-safe /usr/local/bin/atbash \
+ && find / -xdev -type f \( -perm -4000 -o -perm -2000 \) -exec chmod a-s {} +
 USER atbash
 
-ENTRYPOINT ["/sbin/tini", "--", "/home/atbash/entrypoint.sh"]
+ENV ATBASH_CLI_BIN=/usr/local/bin/atbash-safe
+
+ENTRYPOINT ["/usr/bin/tini", "--", "/home/atbash/entrypoint.sh"]
 CMD ["sh"]

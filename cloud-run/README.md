@@ -32,11 +32,13 @@ for s in atbash-agent-key atbash-org-name; do
     --role=roles/secretmanager.secretAccessor
 done
 
-# 4. Build the image.
-gcloud builds submit --config cloud-run/cloudbuild.yaml --substitutions=_VERSION=latest .
+# 4. Build the image with an exact CLI version and commit-derived tag.
+IMAGE_TAG="$(git rev-parse --short=12 HEAD)"
+gcloud builds submit --config cloud-run/cloudbuild.yaml \
+  --substitutions="_CLI_VERSION=0.5.8,_IMAGE_TAG=${IMAGE_TAG}" .
 
-# 5. Replace PROJECT_ID in the service spec and deploy.
-sed "s/PROJECT_ID/${PROJECT_ID}/" cloud-run/service.yaml | \
+# 5. Replace PROJECT_ID and IMAGE_TAG in the service spec and deploy.
+sed -e "s/PROJECT_ID/${PROJECT_ID}/" -e "s/IMAGE_TAG/${IMAGE_TAG}/" cloud-run/service.yaml | \
   gcloud run services replace - --region="$REGION"
 
 # 6. Connect.
@@ -58,7 +60,7 @@ gcloud run services execute atbash-sandbox --region="$REGION" --command="bash -i
 | Drop capabilities        | `capabilities.drop: [ALL]`.                                               |
 | No privilege escalation  | `allowPrivilegeEscalation: false`.                                        |
 | Internal ingress only    | `run.googleapis.com/ingress: internal` — no public URL.                   |
-| Pinned CLI version       | Image tag is `:latest`; bump explicitly.                                  |
+| Pinned CLI version       | Build uses exact CLI `0.5.8` and a commit-derived image tag.              |
 
 ## Teardown
 

@@ -1,0 +1,8 @@
+#!/bin/sh
+# Launch the CLI through a fixed Node binary and a sanitized environment.
+# This prevents NODE_OPTIONS preload injection and PATH-based node shadowing.
+
+unset NODE_OPTIONS NODE_PATH
+
+exec /usr/local/bin/node \
+  /usr/local/lib/node_modules/@atbash/cli/dist/bin/atbash.js "$@"

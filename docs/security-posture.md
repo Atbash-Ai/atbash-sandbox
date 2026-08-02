@@ -51,15 +51,17 @@ version), defending against a malicious cloud provider.
 ### Secrets
 
 - The agent key (`ATBASH_AGENT_KEY`) is **never** baked into the image,
-  never committed, and never logged. The default flow generates a fresh
-  keypair *inside* the running container via `atbash keygen` in
-  `entrypoint.sh`; the private half lives only on the tmpfs config dir
-  and dies with the container.
+  committed, or logged. The default flow generates a fresh keypair inside the
+  running container. If a platform injects a key through the environment, the
+  Docker entrypoint validates it, atomically writes it to the mode-`0600`
+  config, and unsets it before starting the user command. The private half
+  lives on the tmpfs config directory and dies with the container.
 - If you prefer to provide your own key, each platform's secret store
   injects `ATBASH_AGENT_KEY` (and `ATBASH_ORG_NAME`) at runtime:
   - Fly.io → `fly secrets set`
   - Render → Environment (`sync: false`)
-  - Devcontainer → Codespaces Secrets / VS Code remote env
+  - Devcontainer → create a disposable key from inside the Codespace; the
+    template intentionally does not forward a host key into the environment.
   - Replit → Secrets panel
   - Cloud Run → Secret Manager (`secretKeyRef`)
 - `.env` (used by `docker compose run --rm atbash`) is `.gitignore`d.
@@ -77,15 +79,18 @@ version), defending against a malicious cloud provider.
 - No public ports for shell-only platforms. `fly.toml` omits `[[services]]`;
   Render uses `type: pserv` (private service); Cloud Run sets
   `ingress: internal`.
-- Egress is unrestricted; the CLI needs to reach the atbash judge endpoint
-  and (optionally) the Honeycomb telemetry endpoint.
+- Egress is unrestricted by default; the CLI needs to reach the Atbash judge
+  endpoint. Production deployments must add provider-specific DNS/firewall/VPC
+  allowlists and block cloud metadata endpoints. The Cloud Run template marks
+  VPC egress as private-ranges-only, but a connector/firewall design is still
+  required before treating that as an allowlist.
 
 ### Supply chain
 
-- The base image is `node:22-alpine`, an Alpine-based image pinned to
-  Node 22 and refreshed by upstream.
-- The atbash CLI is pinned to `@atbash/cli@latest` via the
-  `ATBASH_CLI_VERSION` build arg. Bumps are intentional, not implicit.
+- The base image uses the Node 22 Debian Bookworm slim tag plus an immutable
+  multi-platform manifest digest. Digest updates are intentional and reviewable.
+- The atbash CLI is pinned to the exact `@atbash/cli@0.5.8` release via the
+  `ATBASH_CLI_VERSION` build arg. Version bumps are intentional, not implicit.
 - `npm install` is run with `--no-audit --no-fund --no-update-notifier` to
   avoid noisy egress at build time. Audit is run separately if desired
   (`npm audit --omit=dev` inside the container).
@@ -104,7 +109,7 @@ ls -l  ~/.config/atbash/telemetry.json          # -rw------- atbash atbash
 cat /proc/1/status | grep NoNewPrivs            # NoNewPrivs: 1
 capsh --print 2>/dev/null || grep CapEff /proc/self/status   # all dropped
 touch /etc/test 2>&1                            # read-only: should fail
-atbash --version                                # @atbash/cli@latest
+atbash --version                                # @atbash/cli@0.5.8
 docker history atbash-sandbox:local             # no plaintext secrets
 ```
 

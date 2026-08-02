@@ -8,7 +8,7 @@ template.
 ## Deploy in ~5 minutes
 
 1. Open https://replit.com → **Import from GitHub** →
-   `https://github.com/Atbash-Ai/atbash-quickstart`.
+   `https://github.com/Atbash-Ai/atbash-sandbox`.
 2. In the Replit UI, click the **Secrets** (🔒) tab. Add:
    - `ATBASH_AGENT_KEY`
    - `ATBASH_ORG_NAME`
@@ -28,7 +28,7 @@ atbash judge '{"action":"list_dir","path":"."}'
 | Config permissions 600   | Applied in the boot command (see `.replit` `run`).                        |
 | No host mounts           | Replit filesystems are per-Repl and isolated by design.                   |
 | No local secrets         | Use Replit **Secrets** (encrypted at rest). Never paste keys into the editor. |
-| Pinned CLI version       | The `run` command installs a pinned version on boot (`@atbash/cli@latest`). |
+| Pinned CLI version       | The `run` command installs an exact version on boot (`@atbash/cli@0.5.8`). |
 
 ## When NOT to use Replit
 
