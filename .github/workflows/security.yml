@@ -23,7 +23,13 @@ jobs:
             bash -n "$file"
           done
       - name: ShellCheck
-        run: shellcheck -x $(git ls-files '*.sh')
+        run: |
+          shellcheck -x \
+            entrypoint.sh \
+            prehook/atbash-prehook.sh \
+            tests/entrypoint-unit.sh \
+            tests/prehook-unit.sh \
+            atbash-safe
       - name: Unit tests
         run: |
           bash tests/prehook-unit.sh
@@ -85,7 +91,7 @@ jobs:
             test "$(PATH="$tmp:$PATH" atbash --version)" = 0.5.8
           '
       - name: Scan image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: atbash-sandbox:test
           format: table
