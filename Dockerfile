@@ -57,21 +57,24 @@ RUN mkdir -p /home/atbash/.config/atbash \
 # Telemetry seed — copied into ~/.config/atbash/telemetry.json by entrypoint.sh
 # on every boot. The Atbash SDK only disables telemetry via this file
 # (env vars cannot — see atbash-sdk/src/opentel/telemetry.ts:9).
-COPY --chown=atbash:atbash telemetry/telemetry.json /opt/atbash/telemetry.json
+COPY --chown=root:root telemetry/telemetry.json /opt/atbash/telemetry.json
 
 # Friendly entrypoint that auto-generates an agent keypair on first run
 # (so users can onboard at atbash.ai without copy-pasting a key around).
-COPY --chown=atbash:atbash entrypoint.sh /home/atbash/entrypoint.sh
+# Root-owned so the sandbox user cannot tamper with it.
+COPY --chown=root:root entrypoint.sh /home/atbash/entrypoint.sh
 
 # Smoke test suite — single-file demo run via ./test-suite.sh after onboarding.
-COPY --chown=atbash:atbash test-suite.sh /home/atbash/test-suite.sh
+COPY --chown=root:root test-suite.sh /home/atbash/test-suite.sh
 
 # Detailed multi-suite tests (5 verdicts + 4 supply-chain categories) at
-# /opt/atbash/tests for users who want a more thorough run.
-COPY --chown=atbash:atbash tests/ /opt/atbash/tests/
+# /opt/atbash/tests for users who want a more thorough run. Root-owned
+# so a compromised sandbox cannot silently alter the test suite.
+COPY --chown=root:root tests/ /opt/atbash/tests/
 
 # Opt-in shell-level prehook demonstration (DEBUG trap pattern).
-COPY --chown=atbash:atbash prehook/ /opt/atbash/prehook/
+# Root-owned so the sandbox user cannot tamper with enforcement code.
+COPY --chown=root:root prehook/ /opt/atbash/prehook/
 
 # Hardened CLI launcher: fixed Node path and NODE_OPTIONS/NODE_PATH removal.
 COPY --chown=root:root atbash-safe /usr/local/bin/atbash-safe
@@ -80,6 +83,11 @@ USER root
 RUN chmod 0755 /home/atbash/entrypoint.sh /home/atbash/test-suite.sh \
                /opt/atbash/tests/*.sh /opt/atbash/tests/supply-chain/*.sh \
                /opt/atbash/prehook/*.sh /usr/local/bin/atbash-safe \
+ && chown root:root /home/atbash/entrypoint.sh /home/atbash/test-suite.sh \
+               /opt/atbash/tests/*.sh /opt/atbash/tests/supply-chain/*.sh \
+               /opt/atbash/prehook/*.sh /opt/atbash/prehook/README.md \
+               /opt/atbash/telemetry.json /usr/local/bin/atbash-safe \
+ && chown -R root:root /opt/atbash/tests /opt/atbash/prehook \
  && ln -sf /usr/local/bin/atbash-safe /usr/local/bin/atbash \
  && find / -xdev -type f \( -perm -4000 -o -perm -2000 \) -exec chmod a-s {} +
 USER atbash
