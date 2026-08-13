@@ -1,0 +1,70 @@
+# Atbash-Ai canonical PR QA workflow (v1) — sandbox (Docker/shell) variant.
+# The job ids "static-and-unit" and "container" intentionally match the
+# REQUIRED status-check contexts already configured in this repo's main-branch
+# protection (which currently reference checks no workflow on main provides,
+# leaving every PR unmergeable). PR #4 introduces a richer security.yml with
+# the same job names for its hardened files; this workflow only exercises what
+# exists on main today, so whichever merges first keeps main mergeable.
+#
+# Contract: one check set per repo+PR+head SHA; reruns on synchronize/reopened/
+# ready_for_review; drafts skipped unless QA_RUN_ON_DRAFTS == 'true'; least
+# privilege; no secrets; visible failures.
+name: QA
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  static-and-unit:
+    name: static-and-unit
+    if: github.event_name == 'push' || github.event.pull_request.draft == false || vars.QA_RUN_ON_DRAFTS == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Reject CRLF shell scripts
+        run: '! grep -Il $''\r'' $(git ls-files ''*.sh'') | grep .'
+      - name: Shell syntax
+        run: |
+          for file in $(git ls-files '*.sh'); do
+            bash -n "$file"
+          done
+      # -S warning: fail on warnings/errors; the pre-existing scripts carry a
+      # handful of info-level notes (SC2015/SC2016/SC1091 in the live-agent smoke
+      # suites) that are stylistic, verified 2026-08-13. Tighten after cleanup.
+      - name: ShellCheck
+        run: shellcheck -x -S warning $(git ls-files '*.sh')
+      - name: Validate Compose
+        run: docker compose config --quiet
+        # tests/*.sh and test-suite.sh require a live onboarded agent, so they
+        # are syntax/lint-checked here but not executed (would fake results).
+
+  container:
+    name: container
+    if: github.event_name == 'push' || github.event.pull_request.draft == false || vars.QA_RUN_ON_DRAFTS == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Build image
+        run: docker build -t atbash-sandbox:ci .
+      - name: Non-root image user
+        run: test "$(docker inspect atbash-sandbox:ci --format '{{.Config.User}}')" = atbash
+      - name: CLI smoke (version resolves inside the image)
+        run: docker run --rm --entrypoint sh atbash-sandbox:ci -c 'atbash --version'
+      - name: Config dir permissions
+        run: docker run --rm --entrypoint sh atbash-sandbox:ci -c 'test "$(stat -c %a /home/atbash/.config/atbash)" = 700'
