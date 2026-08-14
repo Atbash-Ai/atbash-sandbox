@@ -1,7 +1,8 @@
 # Prehook (opt-in)
 
 A *prehook* gates every shell command through `atbash judge` **before** bash
-runs it. If the verdict is `BLOCK` or `HOLD`, the command never executes.
+runs it. The command runs only on an explicit `ALLOW`. `BLOCK`, `HOLD`,
+`ERROR`, and an unreachable judge all refuse the command.
 
 This is **a sandbox-only demonstration** of the pattern — there is no built-in
 prehook in the atbash CLI today. Inside this container the wiring is a bash

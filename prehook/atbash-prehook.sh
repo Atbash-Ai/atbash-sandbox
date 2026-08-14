@@ -16,6 +16,15 @@ set -u
 # inspecting/disabling it, to avoid infinite recursion and lockouts.
 _ATBASH_PREHOOK_GUARD=0
 
+# Exact allowlist used by the DEBUG trap and by tests/prehook-fail-closed.sh.
+# Unknown verdicts, ERROR, and an unreachable judge must not run the command.
+atbash_prehook_decide() {
+  case "$1" in
+    allow|ALLOW) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 atbash_prehook() {
   [[ $_ATBASH_PREHOOK_GUARD -eq 1 ]] && return 0
   local cmd="${BASH_COMMAND:-}"
@@ -35,7 +44,8 @@ atbash_prehook() {
   # API returns lowercase verdicts (allow/hold/block)
   case "$verdict" in
     allow|ALLOW)
-      return 0
+      atbash_prehook_decide "$verdict"
+      return $?
       ;;
     hold|HOLD)
       printf 'atbash prehook: \033[33mHELD\033[0m — awaiting operator review at https://atbash.ai/held\n' >&2
@@ -48,11 +58,17 @@ atbash_prehook() {
       return 1
       ;;
     *)
-      printf 'atbash prehook: \033[2m(judge unreachable, allowing)\033[0m\n' >&2
-      return 0
+      printf 'atbash prehook: \033[31mBLOCKED\033[0m (judge unreachable or unusable verdict)\n' >&2
+      printf '   command: %s\n' "$cmd" >&2
+      atbash_prehook_decide "$verdict"
+      return $?
       ;;
   esac
 }
+
+if [ "${ATBASH_PREHOOK_TEST:-}" = "1" ]; then
+  return 0 2>/dev/null || true
+fi
 
 trap 'atbash_prehook' DEBUG
 shopt -s extdebug
