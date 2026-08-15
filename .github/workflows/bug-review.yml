@@ -1,0 +1,87 @@
+# Canonical Atbash-Ai bug-review workflow (v1).
+# AUTOMATED STATIC/SECURITY ANALYSIS — this is NOT an LLM code review.
+# (LLM review via Cursor Bugbot / cursor-agent is a separate, currently blocked leg —
+#  see _qa_rollout/DESIGN.md "Admin blockers".)
+#
+# Contract:
+#   - Runs once per repo+PR+head SHA (GitHub check runs are keyed to the head SHA;
+#     concurrency cancels superseded in-progress runs on synchronize).
+#   - Reruns on synchronize / reopened / ready_for_review.
+#   - Skips drafts unless the repo variable QA_RUN_ON_DRAFTS == 'true'.
+#   - Least privilege: contents: read only; no secrets used; safe on fork PRs
+#     (pull_request event only — never pull_request_target).
+#   - Fails visibly: no continue-on-error, no forced-green baselines. Semgrep is
+#     diff-aware (--baseline-commit) so only findings INTRODUCED by the PR fail it.
+name: Bug Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bug-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  static-analysis:
+    name: "bug-review / semgrep (new findings only)"
+    if: github.event.pull_request.draft == false || vars.QA_RUN_ON_DRAFTS == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout PR head (full history for diff-aware scan)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Semgrep — fail on security findings introduced by this PR
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            semgrep/semgrep:1.172.0 \
+            semgrep scan \
+              --metrics=off \
+              --error \
+              --config p/security-audit \
+              --config p/secrets \
+              --baseline-commit "$BASE_SHA" \
+              --text \
+              --text-output /src/semgrep-report.txt \
+              /src
+
+      - name: Upload semgrep report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: semgrep-report-${{ github.event.pull_request.head.sha }}
+          path: semgrep-report.txt
+          retention-days: 14
+          if-no-files-found: ignore
+
+  secret-scan:
+    name: "bug-review / gitleaks (PR commit range)"
+    if: github.event.pull_request.draft == false || vars.QA_RUN_ON_DRAFTS == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout PR head (full history for commit-range scan)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Gitleaks — fail on secrets introduced by this PR's commits
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo:ro" \
+            zricethezav/gitleaks:v8.30.1 \
+            git --log-opts "${BASE_SHA}..${HEAD_SHA}" --redact --no-banner /repo

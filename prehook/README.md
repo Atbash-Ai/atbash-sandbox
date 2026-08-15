@@ -8,6 +8,12 @@ prehook in the atbash CLI today. Inside this container the wiring is a bash
 `DEBUG` trap; in a production agent it would be a wrapper around the agent's
 tool-call layer.
 
+The demo is deliberately **fail-open** when the judge cannot be reached: it
+prints `judge unreachable, allowing` and the shell command continues. Do not
+use this DEBUG-trap demo as a production enforcement boundary. A production
+tool-call wrapper must choose and document its outage policy; safety-critical
+or privileged actions should fail closed.
+
 ## Why it is off by default
 
 The `DEBUG` trap fires on every command, including `cd`, `ls`, and the

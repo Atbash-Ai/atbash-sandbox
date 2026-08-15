@@ -28,7 +28,7 @@ atbash judge '{"action":"list_dir","path":"."}'
 | Config permissions 600   | Applied in the boot command (see `.replit` `run`).                        |
 | No host mounts           | Replit filesystems are per-Repl and isolated by design.                   |
 | No local secrets         | Use Replit **Secrets** (encrypted at rest). Never paste keys into the editor. |
-| Pinned CLI version       | The `run` command installs a pinned version on boot (`@atbash/cli@latest`). |
+| Pinned CLI version       | The `run` command installs `@atbash/cli@0.5.14`; bump it in review.       |
 
 ## When NOT to use Replit
 

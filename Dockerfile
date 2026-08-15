@@ -6,9 +6,9 @@
 # Or with docker-compose (recommended — adds read-only FS, cap_drop, etc.):
 #   docker compose run --rm atbash
 
-FROM node:22-alpine
+FROM node:22-bookworm-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436
 
-ARG ATBASH_CLI_VERSION=latest
+ARG ATBASH_CLI_VERSION=0.5.14
 
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
     NPM_CONFIG_FUND=false \
@@ -16,11 +16,15 @@ ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
 
 # bash for the opt-in prehook (DEBUG trap is bash-specific);
 # tini for PID-1 signal handling; jq is handy for parsing judge JSON output.
-RUN apk add --no-cache bash tini jq ca-certificates
+# The CLI's native SDK publishes glibc Linux packages, so this image must not
+# use Alpine/musl until a matching @atbash/sdk-linux-*-musl package exists.
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends bash tini jq ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
 # Non-root user (reviewer requirement). Explicit UID so platform manifests
 # (Cloud Run securityContext, devcontainer runArgs) can reference it.
-RUN adduser -D -u 10001 -h /home/atbash atbash
+RUN useradd --uid 10001 --create-home --home-dir /home/atbash --shell /bin/sh atbash
 
 # Install the CLI globally — pinned version, not @latest.
 RUN npm install -g "@atbash/cli@${ATBASH_CLI_VERSION}" \
@@ -56,10 +60,13 @@ COPY --chown=atbash:atbash tests/ /opt/atbash/tests/
 COPY --chown=atbash:atbash prehook/ /opt/atbash/prehook/
 
 USER root
-RUN chmod 0755 /home/atbash/entrypoint.sh /home/atbash/test-suite.sh \
+RUN sed -i 's/\r$//' /home/atbash/entrypoint.sh /home/atbash/test-suite.sh \
+               /opt/atbash/tests/*.sh /opt/atbash/tests/supply-chain/*.sh \
+               /opt/atbash/prehook/*.sh \
+ && chmod 0755 /home/atbash/entrypoint.sh /home/atbash/test-suite.sh \
                /opt/atbash/tests/*.sh /opt/atbash/tests/supply-chain/*.sh \
                /opt/atbash/prehook/*.sh
 USER atbash
 
-ENTRYPOINT ["/sbin/tini", "--", "/home/atbash/entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/home/atbash/entrypoint.sh"]
 CMD ["sh"]

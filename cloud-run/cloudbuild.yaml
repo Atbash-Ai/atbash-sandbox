@@ -5,7 +5,7 @@ steps:
       - "-t"
       - "gcr.io/$PROJECT_ID/atbash-sandbox:latest"
       - "--build-arg"
-      - "ATBASH_CLI_VERSION=latest"
+      - "ATBASH_CLI_VERSION=0.5.14"
       - "."
   - name: gcr.io/cloud-builders/docker
     args: ["push", "gcr.io/$PROJECT_ID/atbash-sandbox:latest"]
