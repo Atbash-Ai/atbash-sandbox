@@ -20,7 +20,7 @@ version), defending against a malicious cloud provider.
 ### Process identity
 
 - Container runs as UID/GID **10001**, not root.
-- Implemented in the Dockerfile via `adduser -D -u 10001 -h /home/atbash atbash` +
+- Implemented in the Dockerfile via `useradd --uid 10001 --create-home` +
   `USER atbash`.
 - Enforced platform-by-platform:
   - Cloud Run: `securityContext.runAsNonRoot: true`, `runAsUser: 10001`.
@@ -82,15 +82,16 @@ version), defending against a malicious cloud provider.
 
 ### Supply chain
 
-- The base image is `node:22-alpine`, an Alpine-based image pinned to
-  Node 22 and refreshed by upstream.
-- The atbash CLI is pinned to `@atbash/cli@latest` via the
-  `ATBASH_CLI_VERSION` build arg. Bumps are intentional, not implicit.
+- The base image is `node:22-bookworm-slim` at a reviewed multi-platform
+  digest. Alpine/musl is incompatible with the
+  currently published SDK native packages; only glibc Linux packages exist.
+- The atbash CLI is pinned to `@atbash/cli@0.5.14` via the
+  `ATBASH_CLI_VERSION` build arg. Bumps are intentional, reviewed changes.
 - `npm install` is run with `--no-audit --no-fund --no-update-notifier` to
   avoid noisy egress at build time. Audit is run separately if desired
   (`npm audit --omit=dev` inside the container).
 - No third-party shell scripts are piped from `curl`. The Dockerfile's
-  `apk add` packages are the only network reach during build.
+  Debian package install and npm install are the only network reach during build.
 
 ## Verifying the posture for yourself
 
@@ -104,7 +105,7 @@ ls -l  ~/.config/atbash/telemetry.json          # -rw------- atbash atbash
 cat /proc/1/status | grep NoNewPrivs            # NoNewPrivs: 1
 capsh --print 2>/dev/null || grep CapEff /proc/self/status   # all dropped
 touch /etc/test 2>&1                            # read-only: should fail
-atbash --version                                # @atbash/cli@latest
+atbash --version                                # @atbash/cli@0.5.14
 docker history atbash-sandbox:local             # no plaintext secrets
 ```
 
