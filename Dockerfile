@@ -8,7 +8,10 @@
 
 FROM node:22-alpine
 
-ARG ATBASH_CLI_VERSION=latest
+# Concrete version, not a floating tag: `latest` resolves to whatever the
+# registry serves at build time, so a hijacked publish would land in every
+# build with no diff to review. Bump this line to upgrade.
+ARG ATBASH_CLI_VERSION=0.5.14
 
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
     NPM_CONFIG_FUND=false \
@@ -22,8 +25,13 @@ RUN apk add --no-cache bash tini jq ca-certificates
 # (Cloud Run securityContext, devcontainer runArgs) can reference it.
 RUN adduser -D -u 10001 -h /home/atbash atbash
 
-# Install the CLI globally — pinned version, not @latest.
-RUN npm install -g "@atbash/cli@${ATBASH_CLI_VERSION}" \
+# Install the CLI globally — pinned version, not @latest. This layer runs as
+# root (USER atbash comes below), so --ignore-scripts matters: without it a
+# preinstall/postinstall from the package or any of its deps gets root code
+# execution in the builder. @atbash/cli ships prebuilt JS and declares no
+# install scripts, so nothing is lost. `atbash --version` proves the bin still
+# links correctly afterwards.
+RUN npm install -g --ignore-scripts "@atbash/cli@${ATBASH_CLI_VERSION}" \
  && npm cache clean --force \
  && atbash --version
 

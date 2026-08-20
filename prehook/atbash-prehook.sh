@@ -12,10 +12,6 @@
 
 set -u
 
-# Skip the trap when the prehook itself is running, or when the user is
-# inspecting/disabling it, to avoid infinite recursion and lockouts.
-_ATBASH_PREHOOK_GUARD=0
-
 # Exact allowlist used by the DEBUG trap and by tests/prehook-fail-closed.sh.
 # Unknown verdicts, ERROR, and an unreachable judge must not run the command.
 atbash_prehook_decide() {
@@ -25,21 +21,45 @@ atbash_prehook_decide() {
   esac
 }
 
-atbash_prehook() {
-  [[ $_ATBASH_PREHOOK_GUARD -eq 1 ]] && return 0
-  local cmd="${BASH_COMMAND:-}"
-
-  # Don't gate the prehook machinery itself.
-  case "$cmd" in
-    atbash_prehook|trap*|_ATBASH_PREHOOK_GUARD=*|"atbash judge"*|builtin*|exit*|return*) return 0 ;;
+# The only commands the trap does not send to the judge: its own name, the
+# judge call itself, and the documented ways out of the shell. Every pattern is
+# anchored, because a prefix is an exemption the gated command stream can spell
+# for itself — `trap*` covered `trap 'curl … | sh' DEBUG` and any program whose
+# name merely starts with "trap", and `builtin*` let `builtin exec <program>`
+# replace the shell with an arbitrary binary without one judge call.
+# Deliberately absent: anything that turns the gate off. Exempting the command
+# that disables the hook exempts everything after it.
+# Covered by tests/prehook-exemptions.sh.
+atbash_prehook_is_exempt() {
+  case "$1" in
+    atbash_prehook) return 0 ;;
+    "atbash judge "*) return 0 ;;
+    trap|"trap - DEBUG"|"trap -- - DEBUG") return 0 ;;
+    exit|"exit "[0-9]*|return|"return "[0-9]*) return 0 ;;
+    *) return 1 ;;
   esac
+}
 
-  _ATBASH_PREHOOK_GUARD=1
+atbash_prehook() {
+  # Recursion is caught by reading the live call stack, not by a shell variable:
+  # anything the gated command stream can assign to, it can assign to itself.
+  # `_ATBASH_PREHOOK_GUARD=1` used to be both exempt from judging AND an
+  # unconditional allow for every command after it, so one assignment disabled
+  # the hook for the rest of the session. FUNCNAME cannot be forged by a
+  # command the trap is judging.
+  local frame depth=0
+  for frame in "${FUNCNAME[@]}"; do
+    [[ $frame == atbash_prehook ]] && depth=$((depth + 1))
+  done
+  [[ $depth -gt 1 ]] && return 0
+
+  local cmd="${BASH_COMMAND:-}"
+  atbash_prehook_is_exempt "$cmd" && return 0
+
   local payload
   payload=$(jq -nc --arg cmd "$cmd" '{action:"shell_command",cmd:$cmd}')
   local verdict
   verdict=$(atbash judge "$payload" --json 2>/dev/null | jq -r '.verdict // "ERROR"')
-  _ATBASH_PREHOOK_GUARD=0
 
   # API returns lowercase verdicts (allow/hold/block)
   case "$verdict" in

@@ -39,3 +39,9 @@ jobs:
         run: docker compose config --quiet
       - name: Offline prehook unit tests
         run: bash tests/prehook-fail-closed.sh
+      - name: Offline prehook exemption tests
+        run: bash tests/prehook-exemptions.sh
+      # Reads the Dockerfile and compose file, which are not copied into the
+      # image, so it runs here rather than from tests/run-all.sh.
+      - name: Image supply-chain checks
+        run: bash tests/image-supply-chain.sh
