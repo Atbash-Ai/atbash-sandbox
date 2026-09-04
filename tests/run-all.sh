@@ -36,6 +36,10 @@ run_suite() {
   fi
 }
 
+# Offline unit suites first — no live judge required (they stub it).
+run_suite "prehook-fail-closed.sh" "$HERE/prehook-fail-closed.sh"
+run_suite "prehook-exemptions.sh"  "$HERE/prehook-exemptions.sh"
+
 # Non-jailing suites first.
 run_suite "allow.sh" "$HERE/allow.sh"
 run_suite "hold.sh"  "$HERE/hold.sh"

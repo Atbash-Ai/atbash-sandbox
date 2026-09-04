@@ -84,8 +84,12 @@ version), defending against a malicious cloud provider.
 
 - The base image is `node:22-alpine`, an Alpine-based image pinned to
   Node 22 and refreshed by upstream.
-- The atbash CLI is pinned to `@atbash/cli@latest` via the
-  `ATBASH_CLI_VERSION` build arg. Bumps are intentional, not implicit.
+- The atbash CLI is pinned to `@atbash/cli@0.5.14` via the
+  `ATBASH_CLI_VERSION` build arg, and `docker-compose.yml` passes the same
+  version. Bumps are intentional, not implicit: changing the version is a
+  one-line diff a reviewer can see.
+- The global install runs `--ignore-scripts`. It happens before `USER atbash`,
+  so a package lifecycle script would otherwise execute as root in the builder.
 - `npm install` is run with `--no-audit --no-fund --no-update-notifier` to
   avoid noisy egress at build time. Audit is run separately if desired
   (`npm audit --omit=dev` inside the container).
@@ -104,7 +108,7 @@ ls -l  ~/.config/atbash/telemetry.json          # -rw------- atbash atbash
 cat /proc/1/status | grep NoNewPrivs            # NoNewPrivs: 1
 capsh --print 2>/dev/null || grep CapEff /proc/self/status   # all dropped
 touch /etc/test 2>&1                            # read-only: should fail
-atbash --version                                # @atbash/cli@latest
+atbash --version                                # @atbash/cli@0.5.14 (the pin)
 docker history atbash-sandbox:local             # no plaintext secrets
 ```
 

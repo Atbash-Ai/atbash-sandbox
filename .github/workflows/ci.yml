@@ -1,0 +1,47 @@
+# Pull-request CI for sandbox #6. Runs on drafts.
+# Safe subset ported from QA #5 (ci/pr-qa-and-bug-review): static-and-unit
+# only. Does not add, skip, or weaken #5's musl container job.
+# This branch's offline unit suite (tests/prehook-fail-closed.sh) is executed.
+# Live-agent suites in tests/*.sh are not run (they need an onboarded agent).
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-and-unit:
+    name: static-and-unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Reject CRLF shell scripts
+        run: '! grep -Il $''\r'' $(git ls-files ''*.sh'') | grep .'
+      - name: Shell syntax
+        run: |
+          for file in $(git ls-files '*.sh'); do
+            bash -n "$file"
+          done
+      - name: ShellCheck
+        run: shellcheck -x -S warning $(git ls-files '*.sh')
+      - name: Validate Compose
+        run: docker compose config --quiet
+      - name: Offline prehook unit tests
+        run: bash tests/prehook-fail-closed.sh
+      - name: Offline prehook exemption tests
+        run: bash tests/prehook-exemptions.sh
+      # Reads the Dockerfile and compose file, which are not copied into the
+      # image, so it runs here rather than from tests/run-all.sh.
+      - name: Image supply-chain checks
+        run: bash tests/image-supply-chain.sh
