@@ -25,10 +25,10 @@ atbash judge '{"action":"list_dir","path":"."}'
 | Requirement              | How it's enforced on Replit                                              |
 |--------------------------|---------------------------------------------------------------------------|
 | Non-root user            | **Caveat:** Replit runs your code as the `runner` user, which is not root, but the sandbox cannot enforce `USER` from a Dockerfile. The lockdown is provided by Replit's broader sandboxing (firecracker-based), not by `runAs*` configuration. |
-| Config permissions 600   | Applied in the boot command (see `.replit` `run`).                        |
+| Config permissions 600   | Every **Run** sets `umask 077`, makes `~/.config/atbash` 0700 and chmods any file in it to 0600 (see `.replit` `run`). |
 | No host mounts           | Replit filesystems are per-Repl and isolated by design.                   |
 | No local secrets         | Use Replit **Secrets** (encrypted at rest). Never paste keys into the editor. |
-| Pinned CLI version       | The `run` command installs `@atbash/cli@0.7.4`; bump it in review.        |
+| Pinned CLI version       | The `run` command installs `@atbash/cli@0.7.4` with `--ignore-scripts`, and only when that exact version is not already installed; bump it in review. |
 
 ## When NOT to use Replit
 

@@ -134,7 +134,43 @@ else
   bad "docker-compose.yml passes ATBASH_CLI_VERSION='$compose_version', Dockerfile pins '$version'"
 fi
 
-# 7. The security doc describes the pin that actually exists.
+# 7. Every other place that installs or builds the CLI uses the same pin, and
+#    every npm install/ci line anywhere runs with lifecycle scripts off. The
+#    Replit and devcontainer installs run with the agent key in the
+#    environment (the devcontainer's as root through sudo).
+install_files="Dockerfile replit/.replit .devcontainer/devcontainer.json"
+for f in $install_files; do
+  [ -f "$ROOT/$f" ] || { bad "missing $f"; continue; }
+  npm_cmds=$(code_lines "$ROOT/$f" | grep -oE "npm[[:space:]]+(install|i|ci|add)([[:space:]][^&;|\"']*)?")
+  if [ -z "$npm_cmds" ]; then
+    [ "$f" = Dockerfile ] || bad "$f has no npm install line to check (expected one)"
+    continue
+  fi
+  while IFS= read -r cmd; do
+    [ -n "$cmd" ] || continue
+    if ! printf '%s' "$cmd" | grep -q -- '--ignore-scripts'; then
+      bad "$f: '$cmd' runs package lifecycle scripts (add --ignore-scripts)"
+    else
+      ok "$f: '$(printf '%s' "$cmd" | sed 's/[[:space:]\\]*$//')' passes --ignore-scripts"
+    fi
+  done <<< "$npm_cmds"
+done
+for f in replit/.replit .devcontainer/devcontainer.json; do
+  specs=$(code_lines "$ROOT/$f" | grep -oE '@atbash/cli(@[^[:space:]&;|"'"'"']*)?' | sort -u)
+  if [ "$specs" = "@atbash/cli@$version" ]; then
+    ok "$f installs @atbash/cli@$version only"
+  else
+    bad "$f names @atbash/cli as '$(printf '%s' "$specs" | tr '\n' ' ')', want only @atbash/cli@$version"
+  fi
+done
+build_arg=$(code_lines "$ROOT/cloud-run/cloudbuild.yaml" | grep -oE 'ATBASH_CLI_VERSION=[^"[:space:]]*' | sort -u)
+if [ "$build_arg" = "ATBASH_CLI_VERSION=$version" ]; then
+  ok "cloud-run/cloudbuild.yaml builds with ATBASH_CLI_VERSION=$version"
+else
+  bad "cloud-run/cloudbuild.yaml passes '$(printf '%s' "$build_arg" | tr '\n' ' ')', want ATBASH_CLI_VERSION=$version"
+fi
+
+# 8. The security doc describes the pin that actually exists.
 if grep -q '@atbash/cli@latest' "$ROOT/docs/security-posture.md"; then
   bad "docs/security-posture.md still claims the CLI is pinned to @atbash/cli@latest"
 elif grep -q "@atbash/cli@$version" "$ROOT/docs/security-posture.md" \
