@@ -6,12 +6,22 @@
 # Or with docker-compose (recommended — adds read-only FS, cap_drop, etc.):
 #   docker compose run --rm atbash
 
-FROM node:22-alpine
+# Debian (glibc), not Alpine (musl): every published @atbash/sdk-linux-x64-musl
+# (0.8.0 through 0.9.1) is a glibc binary (readelf: NEEDED libc.so.6 and
+# ld-linux-x86-64.so.2, GLIBC_2.34 symbol versions), so on Alpine the CLI
+# cannot load its native SDK and `atbash --version` fails. Stay on glibc until
+# a real musl build is published.
+#
+# Pinned by the multi-platform index digest so a re-pushed tag cannot change
+# the base without a diff. Verified 2026-09-28 with
+# `docker buildx imagetools inspect node:22-bookworm-slim`
+# (linux/amd64 manifest sha256:25330af3531fb5e23318554a0aa911125b6e91b1b777edf7655501d207c067a2).
+FROM node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
 
 # Concrete version, not a floating tag: `latest` resolves to whatever the
 # registry serves at build time, so a hijacked publish would land in every
 # build with no diff to review. Bump this line to upgrade.
-ARG ATBASH_CLI_VERSION=0.5.14
+ARG ATBASH_CLI_VERSION=0.7.4
 
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
     NPM_CONFIG_FUND=false \
@@ -19,11 +29,15 @@ ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
 
 # bash for the opt-in prehook (DEBUG trap is bash-specific);
 # tini for PID-1 signal handling; jq is handy for parsing judge JSON output.
-RUN apk add --no-cache bash tini jq ca-certificates
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends bash tini jq ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
-# Non-root user (reviewer requirement). Explicit UID so platform manifests
+# Non-root user (reviewer requirement). Explicit UID/GID so platform manifests
 # (Cloud Run securityContext, devcontainer runArgs) can reference it.
-RUN adduser -D -u 10001 -h /home/atbash atbash
+RUN groupadd --gid 10001 atbash \
+ && useradd --uid 10001 --gid 10001 --create-home --home-dir /home/atbash \
+            --shell /bin/sh atbash
 
 # Install the CLI globally — pinned version, not @latest. This layer runs as
 # root (USER atbash comes below), so --ignore-scripts matters: without it a
@@ -69,5 +83,5 @@ RUN chmod 0755 /home/atbash/entrypoint.sh /home/atbash/test-suite.sh \
                /opt/atbash/prehook/*.sh
 USER atbash
 
-ENTRYPOINT ["/sbin/tini", "--", "/home/atbash/entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/home/atbash/entrypoint.sh"]
 CMD ["sh"]

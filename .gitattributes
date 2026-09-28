@@ -1,0 +1,4 @@
+# Shell scripts are copied into the Linux image and run by bash/sh there; a
+# CRLF checkout (core.autocrlf=true on Windows) breaks them with "\r: command
+# not found". Force LF in every working tree instead of stripping it at build.
+*.sh text eol=lf
