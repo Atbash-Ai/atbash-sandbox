@@ -18,9 +18,10 @@
 # (linux/amd64 manifest sha256:25330af3531fb5e23318554a0aa911125b6e91b1b777edf7655501d207c067a2).
 FROM node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
 
-# Concrete version, not a floating tag: `latest` resolves to whatever the
-# registry serves at build time, so a hijacked publish would land in every
-# build with no diff to review. Bump this line to upgrade.
+# The CLI version the committed lockfile (cli/package-lock.json) installs.
+# The install below fails the build if the lock resolves any other version, so
+# this arg, docker-compose.yml and the lock cannot drift apart silently. To
+# upgrade: bump cli/package.json, regenerate the lock, bump this line.
 ARG ATBASH_CLI_VERSION=0.7.4
 
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
@@ -39,14 +40,22 @@ RUN groupadd --gid 10001 atbash \
  && useradd --uid 10001 --gid 10001 --create-home --home-dir /home/atbash \
             --shell /bin/sh atbash
 
-# Install the CLI globally — pinned version, not @latest. This layer runs as
-# root (USER atbash comes below), so --ignore-scripts matters: without it a
-# preinstall/postinstall from the package or any of its deps gets root code
-# execution in the builder. @atbash/cli ships prebuilt JS and declares no
-# install scripts, so nothing is lost. `atbash --version` proves the bin still
-# links correctly afterwards.
-RUN npm install -g --ignore-scripts "@atbash/cli@${ATBASH_CLI_VERSION}" \
+# Install the CLI from the committed lockfile, not from a version range.
+# `npm install -g @atbash/cli@X` pins only the top package: its @atbash/sdk
+# (^0.9.0) and about 60 transitive packages float to whatever the registry serves at
+# build time. `npm ci` installs exactly the tree in cli/package-lock.json, with
+# every tarball checked against its sha512 integrity hash, and fails if
+# package.json and the lock disagree.
+# This layer runs as root, so --ignore-scripts matters: without it a
+# preinstall/postinstall from any package in the tree gets root code execution
+# in the builder. The CLI and SDK ship prebuilt JS and native binaries and need
+# no install scripts (the lock records hasInstallScript for none of them).
+COPY cli/package.json cli/package-lock.json /opt/atbash/cli/
+WORKDIR /opt/atbash/cli
+RUN npm ci --ignore-scripts --omit=dev \
  && npm cache clean --force \
+ && test "$(node -p "require('./node_modules/@atbash/cli/package.json').version")" = "${ATBASH_CLI_VERSION}" \
+ && ln -s /opt/atbash/cli/node_modules/.bin/atbash /usr/local/bin/atbash \
  && atbash --version
 
 USER atbash

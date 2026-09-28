@@ -93,17 +93,29 @@ version), defending against a malicious cloud provider.
   `atbash --version` fails. Revisit when a real musl build is published.
 - `tini` comes from Debian at `/usr/bin/tini` and runs as PID 1 in front of
   `entrypoint.sh`.
-- The atbash CLI is pinned to `@atbash/cli@0.7.4` via the
-  `ATBASH_CLI_VERSION` build arg, and `docker-compose.yml` passes the same
-  version. Bumps are intentional, not implicit: changing the version is a
-  one-line diff a reviewer can see.
-- The global install runs `--ignore-scripts`. It happens before `USER atbash`,
-  so a package lifecycle script would otherwise execute as root in the builder.
-- `npm install` is run with `--no-audit --no-fund --no-update-notifier` to
-  avoid noisy egress at build time. Audit is run separately if desired
-  (`npm audit --omit=dev` inside the container).
+- The atbash CLI is `@atbash/cli@0.7.4`, installed with `npm ci` from the
+  committed `cli/package.json` + `cli/package-lock.json`. The lock pins the
+  whole tree (the CLI, `@atbash/sdk`, its native platform packages and every
+  transitive dependency) to exact versions with sha512 integrity hashes, so
+  the registry cannot change what a build installs. Pinning only the CLI
+  would not do that: `@atbash/cli@0.7.4` asks for `@atbash/sdk@^0.9.0`, and
+  0.9.1 was published after 0.7.4.
+- Bumps are intentional only because of the lock: an upgrade is a reviewed
+  diff to `cli/package.json`, `cli/package-lock.json`, the Dockerfile's
+  `ATBASH_CLI_VERSION` and `docker-compose.yml`. The build fails if the arg
+  and the locked CLI version disagree, and `tests/image-supply-chain.sh`
+  checks all four agree and that every locked package has an integrity hash.
+  Regenerate the lock inside the pinned base image with
+  `npm install --package-lock-only --ignore-scripts` in `cli/`.
+- The install runs `--ignore-scripts`. It happens before `USER atbash`, so a
+  package lifecycle script would otherwise execute as root in the builder.
+- The upstream fix is for `@atbash/cli` to publish an `npm-shrinkwrap.json`,
+  so every consumer (not only this image) gets the locked tree.
+- `NPM_CONFIG_AUDIT`, `NPM_CONFIG_FUND` and `NPM_CONFIG_UPDATE_NOTIFIER` are
+  off to avoid noisy egress at build time. Audit is run separately if
+  desired (`npm audit --omit=dev` in `/opt/atbash/cli`).
 - No third-party shell scripts are piped from `curl`. The Debian package
-  install (`apt-get install --no-install-recommends`) and the pinned npm
+  install (`apt-get install --no-install-recommends`) and the locked npm
   install are the only network reach during build.
 
 ## Verifying the posture for yourself
