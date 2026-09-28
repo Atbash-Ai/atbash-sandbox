@@ -73,30 +73,44 @@ RUN atbash --version
 RUN mkdir -p /home/atbash/.config/atbash \
  && chmod 0700 /home/atbash/.config/atbash
 
+# Everything below is copied as root and stays root-owned: the runtime user
+# must not be able to rewrite the guards it runs under (the entrypoint that
+# re-applies 0700/0600, the prehook that gates its shell) or the tests that
+# check them. Scripts are 0755, everything else 0644, directories 0755.
+# The entrypoint lives in /opt/atbash, not in the atbash-owned home, because a
+# root-owned file in a user-owned directory can still be replaced by renaming.
+USER root
+
 # Telemetry seed — copied into ~/.config/atbash/telemetry.json by entrypoint.sh
 # on every boot. The Atbash SDK only disables telemetry via this file
 # (env vars cannot — see atbash-sdk/src/opentel/telemetry.ts:9).
-COPY --chown=atbash:atbash telemetry/telemetry.json /opt/atbash/telemetry.json
+COPY telemetry/telemetry.json /opt/atbash/telemetry.json
 
 # Friendly entrypoint that auto-generates an agent keypair on first run
 # (so users can onboard at atbash.ai without copy-pasting a key around).
-COPY --chown=atbash:atbash entrypoint.sh /home/atbash/entrypoint.sh
+COPY entrypoint.sh /opt/atbash/entrypoint.sh
 
 # Smoke test suite — single-file demo run via ./test-suite.sh after onboarding.
-COPY --chown=atbash:atbash test-suite.sh /home/atbash/test-suite.sh
+COPY test-suite.sh /home/atbash/test-suite.sh
 
 # Detailed multi-suite tests (5 verdicts + 4 supply-chain categories) at
 # /opt/atbash/tests for users who want a more thorough run.
-COPY --chown=atbash:atbash tests/ /opt/atbash/tests/
+COPY tests/ /opt/atbash/tests/
 
 # Opt-in shell-level prehook demonstration (DEBUG trap pattern).
-COPY --chown=atbash:atbash prehook/ /opt/atbash/prehook/
+COPY prehook/ /opt/atbash/prehook/
 
-USER root
-RUN chmod 0755 /home/atbash/entrypoint.sh /home/atbash/test-suite.sh \
+# COPY keeps the build context's modes, which differ between Linux and
+# Windows clients, so set every mode explicitly.
+RUN chown -R root:root /opt/atbash/telemetry.json /opt/atbash/entrypoint.sh \
+                       /home/atbash/test-suite.sh /opt/atbash/tests /opt/atbash/prehook \
+ && find /opt/atbash/tests /opt/atbash/prehook -type d -exec chmod 0755 {} + \
+ && find /opt/atbash/tests /opt/atbash/prehook -type f -exec chmod 0644 {} + \
+ && chmod 0644 /opt/atbash/telemetry.json \
+ && chmod 0755 /opt/atbash /opt/atbash/entrypoint.sh /home/atbash/test-suite.sh \
                /opt/atbash/tests/*.sh /opt/atbash/tests/supply-chain/*.sh \
                /opt/atbash/prehook/*.sh
 USER atbash
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/home/atbash/entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/opt/atbash/entrypoint.sh"]
 CMD ["sh"]

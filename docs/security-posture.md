@@ -30,6 +30,12 @@ version), defending against a malicious cloud provider.
   - Fly.io, Render: inherit `USER` from the image; platform has no override.
   - Replit: caveat — Replit's `runner` user is not root but is not
     container-level enforced. See `replit/README.md`.
+- The runtime user does not own its guards. `/opt/atbash/entrypoint.sh`
+  (which re-applies the 0700/0600 modes and runs under `tini`), the prehook
+  in `/opt/atbash/prehook/`, the tests and the telemetry seed are root-owned,
+  scripts `0755` and other files `0644`, so uid 10001 cannot rewrite them.
+  The entrypoint sits in `/opt/atbash` rather than the atbash-owned home,
+  where a root-owned file could still be replaced by renaming it.
 
 ### Filesystem
 
@@ -44,8 +50,9 @@ version), defending against a malicious cloud provider.
 ### Permissions on the atbash config
 
 - `~/.config/atbash/` is mode `0700`.
-- `~/.config/atbash/telemetry.json` is mode `0600`, created at image build
-  time.
+- `~/.config/atbash/telemetry.json` is mode `0600`, copied by
+  `entrypoint.sh` on every boot from the root-owned seed
+  `/opt/atbash/telemetry.json`.
 - The CLI's `atbash keygen` produces `~/.config/atbash/config.json` mode
   `0600`; documented in the SDK as a requirement (`atbash-sdk/src/opentel/telemetry.ts:7-9`).
 

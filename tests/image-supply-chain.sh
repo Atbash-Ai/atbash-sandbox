@@ -114,6 +114,16 @@ else
   ok "no atbash invocation before the first USER atbash (the smoke check runs as the runtime user)"
 fi
 
+# 5b. The runtime user does not own what it runs under. A COPY --chown to the
+#     atbash user hands uid 10001 write access to the entrypoint, prehook and
+#     tests; they are copied as root and chmodded instead.
+chown_copy=$(printf '%s\n' "$docker_code" | grep -Ei '^[[:space:]]*(COPY|ADD)[[:space:]].*--chown=(atbash|10001)' | head -1)
+if [ -n "$chown_copy" ]; then
+  bad "Dockerfile gives the runtime user ownership of copied files: $chown_copy"
+else
+  ok "no COPY/ADD hands files to the runtime user (guards stay root-owned)"
+fi
+
 # 6. Compose does not override the pin with a floating tag.
 compose_version=$(sed -n 's/.*ATBASH_CLI_VERSION:[[:space:]]*//p' "$ROOT/docker-compose.yml" | tr -d '"' | tr -d '\r' | head -1)
 if [ -z "$compose_version" ]; then
