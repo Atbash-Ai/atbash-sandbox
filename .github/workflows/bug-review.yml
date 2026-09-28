@@ -9,7 +9,7 @@
 #   - Reruns on synchronize / reopened / ready_for_review.
 #   - Skips drafts unless the repo variable QA_RUN_ON_DRAFTS == 'true'.
 #   - Least privilege: contents: read only; no secrets used; safe on fork PRs
-#     (pull_request event only — never pull_request_target).
+#     (triggered by the plain pull_request event only, never its privileged "_target" variant).
 #   - Fails visibly: no continue-on-error, no forced-green baselines. Semgrep is
 #     diff-aware (--baseline-commit) so only findings INTRODUCED by the PR fail it.
 name: Bug Review
