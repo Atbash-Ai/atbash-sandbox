@@ -55,11 +55,17 @@ WORKDIR /opt/atbash/cli
 RUN npm ci --ignore-scripts --omit=dev \
  && npm cache clean --force \
  && test "$(node -p "require('./node_modules/@atbash/cli/package.json').version")" = "${ATBASH_CLI_VERSION}" \
- && ln -s /opt/atbash/cli/node_modules/.bin/atbash /usr/local/bin/atbash \
- && atbash --version
+ && ln -s /opt/atbash/cli/node_modules/.bin/atbash /usr/local/bin/atbash
 
 USER atbash
 WORKDIR /home/atbash
+
+# Smoke check as the runtime user, never as root: `atbash --version` loads the
+# SDK's native binary, and nothing from the registry should execute with root
+# privileges in the builder. The version check above only reads package.json.
+# tests/image-supply-chain.sh fails if any atbash invocation precedes the first
+# `USER atbash`.
+RUN atbash --version
 
 # Config dir for atbash CLI; entrypoint.sh ensures 0700/0600 perms at runtime.
 # When docker-compose mounts this path as tmpfs (read-only root FS pattern),

@@ -97,7 +97,24 @@ else
   ok "Dockerfile has no npm install beside the locked npm ci"
 fi
 
-# 5. Compose does not override the pin with a floating tag.
+# 5. Nothing runs the CLI as root at build time. Everything before the first
+#    `USER atbash` runs as root; an `atbash` command there executes the SDK's
+#    native binary with root privileges in the builder. Matches `atbash` in
+#    command position (after RUN, &&, ||, ;, |, optionally via exec), not as
+#    an argument such as `useradd ... atbash` or a path ending in /atbash.
+invoke_re='(^[[:space:]]*RUN|&&|\|\||;|\|)[[:space:]]*(exec[[:space:]]+)?atbash([[:space:]]|$)'
+user_re='^[[:space:]]*USER[[:space:]]+atbash([[:space:]]|$)'
+pre_user=$(printf '%s\n' "$docker_code" | awk -v re="$user_re" '$0 ~ re { exit } { print }')
+root_call=$(printf '%s\n' "$pre_user" | grep -E "$invoke_re" | head -1 | sed 's/^[[:space:]]*//')
+if ! printf '%s\n' "$docker_code" | grep -Eq "$user_re"; then
+  bad "Dockerfile never switches to USER atbash"
+elif [ -n "$root_call" ]; then
+  bad "Dockerfile runs atbash as root before the first USER atbash: $root_call"
+else
+  ok "no atbash invocation before the first USER atbash (the smoke check runs as the runtime user)"
+fi
+
+# 6. Compose does not override the pin with a floating tag.
 compose_version=$(sed -n 's/.*ATBASH_CLI_VERSION:[[:space:]]*//p' "$ROOT/docker-compose.yml" | tr -d '"' | tr -d '\r' | head -1)
 if [ -z "$compose_version" ]; then
   ok "docker-compose.yml inherits the Dockerfile pin"
@@ -107,7 +124,7 @@ else
   bad "docker-compose.yml passes ATBASH_CLI_VERSION='$compose_version', Dockerfile pins '$version'"
 fi
 
-# 6. The security doc describes the pin that actually exists.
+# 7. The security doc describes the pin that actually exists.
 if grep -q '@atbash/cli@latest' "$ROOT/docs/security-posture.md"; then
   bad "docs/security-posture.md still claims the CLI is pinned to @atbash/cli@latest"
 elif grep -q "@atbash/cli@$version" "$ROOT/docs/security-posture.md" \

@@ -109,6 +109,9 @@ version), defending against a malicious cloud provider.
   `npm install --package-lock-only --ignore-scripts` in `cli/`.
 - The install runs `--ignore-scripts`. It happens before `USER atbash`, so a
   package lifecycle script would otherwise execute as root in the builder.
+- Nothing from the registry executes as root at build time. The root layer
+  only checks the locked version by reading `package.json`; the
+  `atbash --version` smoke check runs after `USER atbash`, as uid 10001.
 - The upstream fix is for `@atbash/cli` to publish an `npm-shrinkwrap.json`,
   so every consumer (not only this image) gets the locked tree.
 - `NPM_CONFIG_AUDIT`, `NPM_CONFIG_FUND` and `NPM_CONFIG_UPDATE_NOTIFIER` are
