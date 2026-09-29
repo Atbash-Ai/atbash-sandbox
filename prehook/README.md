@@ -4,6 +4,14 @@ A *prehook* gates every shell command through `atbash judge` **before** bash
 runs it. The command runs only on an explicit `ALLOW`. `BLOCK`, `HOLD`,
 `ERROR`, and an unreachable judge all refuse the command.
 
+"Explicit" means both halves of the CLI's answer: the `--json` verdict word is
+`allow` **and** `atbash judge` exited `0`. The CLI prints the judge's verdict
+word even when it refuses the response (a self-contradicting or vetoed ALLOW,
+a signature that did not verify: exit `1`), and since `@atbash/cli` 0.7.x-dev
+it exits `3` on a HOLD (it used to exit `0`). Exit codes: `0` ALLOW/LOGGED,
+`1` error, `2` BLOCK, `3` HOLD. A shell gate of your own should do the same:
+`atbash judge '...' && <command>` runs `<command>` only on exit `0`.
+
 This is **a sandbox-only demonstration** of the pattern — there is no built-in
 prehook in the atbash CLI today. Inside this container the wiring is a bash
 `DEBUG` trap; in a production agent it would be a wrapper around the agent's
