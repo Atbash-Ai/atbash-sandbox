@@ -16,10 +16,10 @@
   // as the Dockerfile.
   "image": "mcr.microsoft.com/devcontainers/javascript-node:22-bookworm",
 
-  "containerEnv": {
-    "ATBASH_AGENT_KEY": "${localEnv:ATBASH_AGENT_KEY}",
-    "ATBASH_ORG_NAME":  "${localEnv:ATBASH_ORG_NAME}"
-  },
+  // remoteEnv only, not containerEnv: containerEnv is written into the
+  // container's config, where `docker inspect` (and anything else that can
+  // read the Docker API) shows the agent key in plain text. remoteEnv is
+  // applied to the VS Code server and its terminals instead.
   "remoteEnv": {
     "ATBASH_AGENT_KEY": "${localEnv:ATBASH_AGENT_KEY}",
     "ATBASH_ORG_NAME":  "${localEnv:ATBASH_ORG_NAME}"

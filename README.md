@@ -91,9 +91,10 @@ off by default.
 
 ## How to test safely
 
-1. **Your laptop's files are out of reach.** No template mounts a host
-   path. `docker-compose.yml` has no `volumes:`; `fly.toml` has no
-   `[mounts]`; the devcontainer uses an anonymous volume.
+1. **Your laptop's files are out of reach.** No hardened template mounts
+   a host path. `docker-compose.yml` has no `volumes:`; `fly.toml` has no
+   `[mounts]`. The devcontainer is the exception: it mounts your checkout,
+   so use Compose for untrusted payloads.
 2. **The agent key never leaves the container.** The entrypoint runs
    `atbash keygen` inside the sandbox — the private key lives in
    `~/.config/atbash/config.json` (mode 0600) on tmpfs and dies with the

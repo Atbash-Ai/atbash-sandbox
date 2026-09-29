@@ -66,9 +66,11 @@ not affect what the judge or the immutable audit log do with your queries.**
 ### Can the sandbox read files off my laptop?
 
 No. None of the templates mount a host path. `docker-compose.yml` has no
-`volumes:` block; `fly.toml` has no `[mounts]`; the devcontainer config
-sets `workspaceMount` to a fresh anonymous volume; cloud runtimes don't
-allow host mounts at all.
+`volumes:` block; `fly.toml` has no `[mounts]`; cloud runtimes don't
+allow host mounts at all. The exception is the devcontainer: it uses the
+default workspace mount, which bind-mounts your checkout when run locally in
+VS Code. It is a dev-loop convenience, not a hardened target; use Compose
+for untrusted payloads.
 
 ### What about the agent key — is it in the image?
 

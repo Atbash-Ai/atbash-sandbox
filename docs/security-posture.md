@@ -25,7 +25,9 @@ version), defending against a malicious cloud provider.
   `USER atbash`.
 - Enforced platform-by-platform:
   - Cloud Run: `securityContext.runAsNonRoot: true`, `runAsUser: 10001`.
-  - Devcontainer: `"remoteUser": "atbash"`, `"containerUser": "atbash"`.
+  - Devcontainer: not enforced. `.devcontainer/devcontainer.json` uses
+    Microsoft's `javascript-node` base and its default user; it is a
+    dev-loop convenience, not a hardened target (see its header comment).
   - Docker Compose: inherits `USER` from the image.
   - Fly.io, Render: inherit `USER` from the image; platform has no override.
   - Replit: caveat — Replit's `runner` user is not root but is not
@@ -43,8 +45,10 @@ version), defending against a malicious cloud provider.
   Compose `read_only: true`, Cloud Run `readOnlyRootFilesystem: true`).
 - **Writable scratch space** via `tmpfs` for `/tmp` and the atbash cache
   dir. Tmpfs evaporates on container stop.
-- **No host bind mounts**. The closest exception is the devcontainer's
-  `workspaceMount`, which is an anonymous Docker volume — not a host path.
+- **No host bind mounts** in the hardened targets. The exception is the
+  devcontainer, which uses the dev-containers default workspace mount: your
+  checkout, bind-mounted when run locally in VS Code (a cloned repo in
+  Codespaces). Use Compose for untrusted payloads.
 - **No persistent volumes**. None of the platform manifests provision disks.
 
 ### Permissions on the atbash config
@@ -66,18 +70,19 @@ version), defending against a malicious cloud provider.
 - If you prefer to provide your own key, each platform's secret store
   injects `ATBASH_AGENT_KEY` (and `ATBASH_ORG_NAME`) at runtime:
   - Fly.io → `fly secrets set`
-  - Render → Environment (`sync: false`)
-  - Devcontainer → Codespaces Secrets / VS Code remote env
+  - Render → the service's Environment tab (`render.yaml` declares none)
+  - Devcontainer → Codespaces Secrets / your local env, passed through
+    `remoteEnv` only, so the key is not written into the container config
+    that `docker inspect` shows
   - Replit → Secrets panel
   - Cloud Run → Secret Manager (`secretKeyRef`)
 - `.env` (used by `docker compose run --rm atbash`) is `.gitignore`d.
 
 ### Linux capabilities & privilege escalation
 
-- `cap_drop: [ALL]` (Docker Compose, Devcontainer `runArgs`, Cloud Run
+- `cap_drop: [ALL]` (Docker Compose, Cloud Run
   `capabilities.drop: [ALL]`).
-- `security_opt: ["no-new-privileges:true"]` on Docker Compose and the
-  devcontainer `runArgs`.
+- `security_opt: ["no-new-privileges:true"]` on Docker Compose.
 - Cloud Run: `allowPrivilegeEscalation: false`.
 
 ### Network

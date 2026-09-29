@@ -185,6 +185,14 @@ else
   bad "cloud-run/cloudbuild.yaml passes '$(printf '%s' "$build_arg" | tr '\n' ' ')', want ATBASH_CLI_VERSION=$version"
 fi
 
+# 7b. The devcontainer does not bake the agent key into the container config.
+#     containerEnv values are visible to anyone who can `docker inspect`.
+if code_lines "$ROOT/.devcontainer/devcontainer.json" | grep -q '"containerEnv"'; then
+  bad ".devcontainer/devcontainer.json sets containerEnv (use remoteEnv so the key stays out of docker inspect)"
+else
+  ok ".devcontainer/devcontainer.json passes env through remoteEnv only"
+fi
+
 # 8. The security doc describes the pin that actually exists.
 if grep -q '@atbash/cli@latest' "$ROOT/docs/security-posture.md"; then
   bad "docs/security-posture.md still claims the CLI is pinned to @atbash/cli@latest"
