@@ -63,3 +63,29 @@ jobs:
         run: docker run --rm --entrypoint sh atbash-sandbox:ci -c 'atbash --version'
       - name: Config dir permissions
         run: docker run --rm --entrypoint sh atbash-sandbox:ci -c 'test "$(stat -c %a /home/atbash/.config/atbash)" = 700'
+      # The steps above bypass the entrypoint. These go through the real one:
+      # tini as PID 1 running /opt/atbash/entrypoint.sh, which seeds and
+      # re-moderates the config on boot. The dummy key is not a real key and
+      # never leaves the container.
+      - name: Real entrypoint with a dummy key (tini PID 1, uid 10001, modes)
+        run: |
+          docker run --rm -e ATBASH_AGENT_KEY=ci-dummy-not-a-key atbash-sandbox:ci sh -c '
+            set -e
+            test "$(id -u)" = 10001
+            test "$(readlink /proc/1/exe)" = /usr/bin/tini
+            grep -q /opt/atbash/entrypoint.sh /proc/1/cmdline
+            test "$(stat -c %a ~/.config/atbash)" = 700
+            test "$(stat -c %a ~/.config/atbash/telemetry.json)" = 600
+            if [ -e ~/.config/atbash/config.json ]; then test "$(stat -c %a ~/.config/atbash/config.json)" = 600; fi
+            echo "entrypoint ok: uid 10001, tini PID 1, config 700, telemetry.json 600"'
+      # No key: the entrypoint runs `atbash keygen`, which writes config.json.
+      # Its stdout (a throwaway keypair) is discarded, not logged.
+      - name: Real entrypoint without a key (keygen config.json is 0600)
+        run: |
+          docker run --rm atbash-sandbox:ci sh -c '
+            test "$(id -u)" = 10001 &&
+            test "$(stat -c %a ~/.config/atbash/config.json)" = 600 &&
+            test "$(stat -c %a ~/.config/atbash/telemetry.json)" = 600 ||
+            { echo "keygen boot: wrong uid or config modes" >&2; exit 1; }' >/dev/null
+      - name: Prehook fails closed inside the image (as uid 10001)
+        run: docker run --rm --entrypoint bash atbash-sandbox:ci /opt/atbash/tests/prehook-fail-closed.sh
