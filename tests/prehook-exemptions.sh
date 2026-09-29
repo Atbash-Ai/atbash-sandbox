@@ -39,9 +39,11 @@ mkdir -p "$WORK/bin"
 
 cat > "$WORK/bin/atbash" <<'STUB'
 #!/usr/bin/env bash
-# Records every call, then answers with $STUB_VERDICT (default: block).
+# Records every call, then answers with $STUB_VERDICT (default: block) and exits with
+# $STUB_EXIT (default 0) - the CLI prints the verdict word even when it refuses the body.
 printf '%s\n' "$*" >> "$STUB_LOG"
 printf '{"verdict":"%s"}\n' "${STUB_VERDICT:-block}"
+exit "${STUB_EXIT:-0}"
 STUB
 
 cat > "$WORK/bin/jq" <<'STUB'
@@ -112,6 +114,29 @@ refute_ran ATB_GUARD_RAN "echo after a guard assignment"
 refute_ran ATB_BUILTIN_RAN "builtin echo"
 reached_judge trapdoor_ATB_TRAPPREFIX "program whose name starts with trap"
 refute_ran ATB_EXEC_RAN "builtin exec bash -c"
+
+# ── end-to-end: the CLI's exit status is authoritative ──────────────────────
+# `atbash judge --json` prints the judge's verdict word even when the CLI refuses the body (a
+# vetoed or self-contradicting ALLOW, a signature that did not verify: exit 1) and exits 3 on a
+# HOLD. An "allow" word with a non-zero exit must not run the command.
+cat > "$WORK/driver2.sh" <<'DRIVER'
+shopt -s extdebug
+set -o functrace
+# shellcheck disable=SC1090 # path comes from the harness
+source "$PREHOOK"
+echo ATB_EXIT_MARKER
+DRIVER
+run_exit_case() {
+  PATH="$WORK/bin:$PATH" PREHOOK="$PREHOOK_SRC" STUB_LOG="$WORK/judge2.log" STUB_VERDICT=allow STUB_EXIT="$1" \
+    bash "$WORK/driver2.sh" > "$WORK/driver2.out" 2>&1
+  if grep -qx ATB_EXIT_MARKER "$WORK/driver2.out"; then echo ran; else echo denied; fi
+}
+echo "--- end-to-end (verdict word allow, CLI exit status varies) ---"
+: > "$WORK/judge2.log"
+for code in 1 2 3; do
+  if [ "$(run_exit_case "$code")" = denied ]; then ok "allow word with exit $code — did not run"; else bad "allow word with exit $code — ran"; fi
+done
+if [ "$(run_exit_case 0)" = ran ]; then ok "allow word with exit 0 — ran (positive control)"; else bad "allow word with exit 0 — did not run"; fi
 
 # ── unit: the exemption matcher itself ──────────────────────────────────────
 echo "--- exemption matcher ---"
