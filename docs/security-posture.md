@@ -107,6 +107,11 @@ version), defending against a malicious cloud provider.
   the registry cannot change what a build installs. Pinning only the CLI
   would not do that: `@atbash/cli@0.7.4` asks for `@atbash/sdk@^0.9.0`, and
   0.9.1 was published after 0.7.4.
+- The image is pinned to `@atbash/sdk@0.9.1`, the current stable SDK, with
+  its glibc native package (`@atbash/sdk-linux-x64-gnu@0.9.1` on amd64). The
+  Dockerfile's `ATBASH_SDK_VERSION` names it, the build fails if the lock
+  installs another SDK version, and `tests/image-supply-chain.sh` checks the
+  lock against that arg, so an SDK bump is a visible diff.
 - Bumps are intentional only because of the lock: an upgrade is a reviewed
   diff to `cli/package.json`, `cli/package-lock.json`, the Dockerfile's
   `ATBASH_CLI_VERSION` and `docker-compose.yml`. The build fails if the arg

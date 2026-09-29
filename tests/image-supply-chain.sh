@@ -72,6 +72,21 @@ if [ "$locked_cli" = "$version" ]; then
 else
   bad "cli/package-lock.json locks @atbash/cli '$locked_cli', Dockerfile pins '$version'"
 fi
+sdk_version=$(sed -n 's/^ARG ATBASH_SDK_VERSION=\(.*\)$/\1/p' "$ROOT/Dockerfile" | tr -d '"' | tr -d '\r')
+if ! printf '%s' "$sdk_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+  bad "Dockerfile ARG ATBASH_SDK_VERSION='$sdk_version' is not a concrete version"
+else
+  sdk_mismatch=""
+  for p in sdk sdk-linux-x64-gnu sdk-linux-arm64-gnu; do
+    v=$(jq -r --arg k "node_modules/@atbash/$p" '.packages[$k].version // "missing"' "$ROOT/cli/package-lock.json")
+    [ "$v" = "$sdk_version" ] || sdk_mismatch="$sdk_mismatch @atbash/$p=$v"
+  done
+  if [ -z "$sdk_mismatch" ]; then
+    ok "cli/package-lock.json locks @atbash/sdk and its glibc native packages at $sdk_version (Dockerfile ATBASH_SDK_VERSION)"
+  else
+    bad "cli/package-lock.json SDK versions differ from Dockerfile ATBASH_SDK_VERSION=$sdk_version:$sdk_mismatch"
+  fi
+fi
 entries=$(jq '[.packages | to_entries[] | select(.key != "")] | length' "$ROOT/cli/package-lock.json")
 unhashed=$(jq -r '.packages | to_entries[] | select(.key != "" and (.value.link | not))
   | select(((.value.integrity // "") | startswith("sha512-") | not)

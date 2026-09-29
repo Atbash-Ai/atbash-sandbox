@@ -24,6 +24,13 @@ FROM node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddf
 # upgrade: bump cli/package.json, regenerate the lock, bump this line.
 ARG ATBASH_CLI_VERSION=0.7.4
 
+# The @atbash/sdk version the lock resolves under the CLI, together with its
+# glibc native package (@atbash/sdk-linux-x64-gnu on amd64,
+# @atbash/sdk-linux-arm64-gnu on arm64) at the same version. 0.9.1 is
+# the current stable SDK (SDK PRs #174/#176). The build fails if the lock
+# installs anything else, so an SDK bump is a visible diff here too.
+ARG ATBASH_SDK_VERSION=0.9.1
+
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_AUDIT=false
@@ -55,6 +62,8 @@ WORKDIR /opt/atbash/cli
 RUN npm ci --ignore-scripts --omit=dev \
  && npm cache clean --force \
  && test "$(node -p "require('./node_modules/@atbash/cli/package.json').version")" = "${ATBASH_CLI_VERSION}" \
+ && test "$(node -p "require('./node_modules/@atbash/sdk/package.json').version")" = "${ATBASH_SDK_VERSION}" \
+ && test "$(node -p "require('./node_modules/@atbash/sdk-linux-' + process.arch + '-gnu/package.json').version")" = "${ATBASH_SDK_VERSION}" \
  && ln -s /opt/atbash/cli/node_modules/.bin/atbash /usr/local/bin/atbash
 
 USER atbash
