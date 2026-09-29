@@ -14,7 +14,13 @@ set -u
 
 # Exact allowlist used by the DEBUG trap and by tests/prehook-fail-closed.sh.
 # Unknown verdicts, ERROR, and an unreachable judge must not run the command.
+#
+# $1 is the verdict word from `atbash judge --json`, $2 is that command's exit status. Both must
+# say "allow": the CLI reconciles the verdict word with the judge's action_type, its canonical
+# allow and (for a self-hosted judge) the response signature, and it still prints the verdict word
+# when it refuses the body. Exit codes: 0 ALLOW/LOGGED, 1 error, 2 BLOCK, 3 HOLD.
 atbash_prehook_decide() {
+  [ "${2-}" = "0" ] || return 1
   case "$1" in
     allow|ALLOW) return 0 ;;
     *) return 1 ;;
@@ -58,13 +64,23 @@ atbash_prehook() {
 
   local payload
   payload=$(jq -nc --arg cmd "$cmd" '{action:"shell_command",cmd:$cmd}')
-  local verdict
-  verdict=$(atbash judge "$payload" --json 2>/dev/null | jq -r '.verdict // "ERROR"')
+  local out rc verdict
+  out=$(atbash judge "$payload" --json 2>/dev/null)
+  rc=$?
+  verdict=$(printf '%s\n' "$out" | jq -r '.verdict // "ERROR"' 2>/dev/null)
+  [ -n "$verdict" ] || verdict=ERROR
+  # The exit status is authoritative: 3 is a HOLD and 2 a BLOCK whatever the word says, and any
+  # other non-zero status turns an "allow" into an error.
+  if [ "$rc" = "3" ]; then verdict=hold; fi
+  if [ "$rc" = "2" ]; then verdict=block; fi
+  if [ "$rc" != "0" ]; then
+    case "$verdict" in hold|HOLD|block|BLOCK) ;; *) verdict=ERROR ;; esac
+  fi
 
   # API returns lowercase verdicts (allow/hold/block)
   case "$verdict" in
     allow|ALLOW)
-      atbash_prehook_decide "$verdict"
+      atbash_prehook_decide "$verdict" "$rc"
       return $?
       ;;
     hold|HOLD)
@@ -80,7 +96,7 @@ atbash_prehook() {
     *)
       printf 'atbash prehook: \033[31mBLOCKED\033[0m (judge unreachable or unusable verdict)\n' >&2
       printf '   command: %s\n' "$cmd" >&2
-      atbash_prehook_decide "$verdict"
+      atbash_prehook_decide "$verdict" "$rc"
       return $?
       ;;
   esac
