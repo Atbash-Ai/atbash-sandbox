@@ -22,22 +22,26 @@ rm -f "$PREHOOK_SRC"
 
 fails=0
 
+# The second argument is `atbash judge`'s exit status. The CLI is what reconciles the judge's
+# verdict word with its action_type and its canonical allow: a body that says "allow" while the
+# CLI exits non-zero (a vetoed or self-contradicting ALLOW, a signature that did not verify) is
+# not permission. Exit codes: 0 ALLOW/LOGGED, 1 error, 2 BLOCK, 3 HOLD.
 expect_deny() {
-  local verdict="$1"
-  if atbash_prehook_decide "$verdict"; then
-    printf '  \033[31mfail\033[0m expected deny for verdict=%s\n' "$verdict"
+  local verdict="$1" rc="${2-0}"
+  if atbash_prehook_decide "$verdict" "$rc"; then
+    printf '  \033[31mfail\033[0m expected deny for verdict=%s exit=%s\n' "$verdict" "$rc"
     fails=$((fails + 1))
   else
-    printf '  \033[32mok\033[0m   denied verdict=%s\n' "$verdict"
+    printf '  \033[32mok\033[0m   denied verdict=%s exit=%s\n' "$verdict" "$rc"
   fi
 }
 
 expect_allow() {
-  local verdict="$1"
-  if atbash_prehook_decide "$verdict"; then
-    printf '  \033[32mok\033[0m   allowed verdict=%s\n' "$verdict"
+  local verdict="$1" rc="${2-0}"
+  if atbash_prehook_decide "$verdict" "$rc"; then
+    printf '  \033[32mok\033[0m   allowed verdict=%s exit=%s\n' "$verdict" "$rc"
   else
-    printf '  \033[31mfail\033[0m expected allow for verdict=%s\n' "$verdict"
+    printf '  \033[31mfail\033[0m expected allow for verdict=%s exit=%s\n' "$verdict" "$rc"
     fails=$((fails + 1))
   fi
 }
@@ -53,6 +57,12 @@ expect_deny error
 expect_deny ""
 expect_deny UNKNOWN
 expect_deny GREEN
+# An "allow" the CLI itself refused (non-zero exit) is not permission.
+expect_deny allow 1
+expect_deny allow 2
+expect_deny allow 3
+expect_deny allow ""
+expect_deny ALLOW 1
 
 if [[ "$fails" -eq 0 ]]; then
   printf '\033[32mPASS\033[0m prehook-fail-closed\n'
