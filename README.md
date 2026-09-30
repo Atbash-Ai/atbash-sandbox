@@ -83,7 +83,7 @@ Gate every shell command through `atbash judge` before bash runs it:
 source /opt/atbash/prehook/install-prehook.sh
 ls                                 # ALLOW → runs
 rm -rf /                           # BLOCK → trap stops it
-trap - DEBUG                       # disable
+exit                               # leave (trap - DEBUG is itself judged)
 ```
 
 See [`prehook/README.md`](prehook/README.md) for the pattern and why it's
