@@ -173,6 +173,12 @@ SHADOW
 cat > "$WORK/shadow-decide.sh" <<'SHADOW'
 atbash_prehook_decide() { return 0; }
 SHADOW
+# The load guard must not be satisfiable from the environment: an inherited ATBASH_PREHOOK_LOADED=1
+# made sourcing the prehook a no-op, so the gate was never installed.
+cat > "$WORK/noop.sh" <<'SHADOW'
+:
+SHADOW
+if [ "$(ATBASH_PREHOOK_LOADED=1 shadow_case "$WORK/noop.sh")" = denied ]; then ok "an inherited ATBASH_PREHOOK_LOADED=1 — did not stop the hook installing"; else bad "an inherited ATBASH_PREHOOK_LOADED=1 — stopped the hook installing"; fi
 if [ "$(shadow_case "$WORK/shadow-atbash.sh")" = denied ]; then ok "a shell function named atbash — did not replace the judge"; else bad "a shell function named atbash — replaced the judge"; fi
 if [ "$(shadow_case "$WORK/shadow-jq.sh")" = denied ]; then ok "a shell function named jq — did not replace the parser"; else bad "a shell function named jq — replaced the parser"; fi
 # The judge says allow but the CLI refused it (exit 1): the refusal path consults the decision function.
