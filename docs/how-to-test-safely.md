@@ -101,9 +101,10 @@ the change to take effect.
 ### Can the prehook block me out of my own shell?
 
 It can, if you enable it and try a command the policy blocks. To recover,
-exit the shell and re-attach without sourcing the install script. Or use a
-new shell on the same container (`bash --noprofile --norc`) and run
-`trap - DEBUG`.
+exit the shell and re-attach without sourcing the install script, or open a
+new shell on the same container (`bash --noprofile --norc`) - the hook lives
+only in the shell that sourced it. (`trap - DEBUG` inside the hooked shell is
+itself judged.)
 
 ### What if I want to test against my own organization without affecting it?
 
