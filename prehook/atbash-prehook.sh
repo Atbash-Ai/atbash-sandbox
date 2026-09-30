@@ -13,7 +13,11 @@
 set -u
 
 # Sourcing twice in one shell is a no-op: the functions and paths below are read-only once set.
-if [ -n "${ATBASH_PREHOOK_LOADED:-}" ]; then return 0 2>/dev/null || true; fi
+# The guard is the READ-ONLY variable this file sets, never a value: an ATBASH_PREHOOK_LOADED
+# inherited from the environment is an ordinary (exported) variable, is discarded, and the hook
+# installs as usual.
+if [[ "$(declare -p ATBASH_PREHOOK_LOADED 2>/dev/null)" == "declare -r"* ]]; then return 0 2>/dev/null || true; fi
+unset ATBASH_PREHOOK_LOADED 2>/dev/null || true
 
 # The judge and the JSON parser are resolved to absolute paths ONCE, here, and frozen. A function
 # named `atbash` or `jq` shadows the command of that name, and defining a function does not fire
