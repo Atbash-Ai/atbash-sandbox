@@ -99,21 +99,23 @@ version), defending against a malicious cloud provider.
   multi-platform index digest in the `FROM` line, so a re-pushed tag cannot
   change the base without a reviewed diff. Refreshing the base means updating
   that digest.
-- Not Alpine: every published `@atbash/sdk-linux-x64-musl` (0.8.0 through
-  0.9.1) is a glibc binary (`readelf -d` lists `libc.so.6` and
-  `ld-linux-x86-64.so.2`), so the CLI cannot load its native SDK on musl and
-  `atbash --version` fails. Revisit when a real musl build is published.
+- Not Alpine: `@atbash/sdk-linux-x64-musl` was a glibc binary from 0.8.0
+  through 0.9.1 (`readelf -d` listed `libc.so.6` and `ld-linux-x86-64.so.2`),
+  so the CLI could not load its native SDK on musl and `atbash --version`
+  failed. Fixed in 0.9.2, which this image pins. Debian is kept for glibc
+  breadth rather than because musl is broken; moving to Alpine is now a size
+  decision, not a blocked one.
 - `tini` comes from Debian at `/usr/bin/tini` and runs as PID 1 in front of
   `entrypoint.sh`.
-- The atbash CLI is `@atbash/cli@0.7.4`, installed with `npm ci` from the
+- The atbash CLI is `@atbash/cli@0.7.6`, installed with `npm ci` from the
   committed `cli/package.json` + `cli/package-lock.json`. The lock pins the
   whole tree (the CLI, `@atbash/sdk`, its native platform packages and every
   transitive dependency) to exact versions with sha512 integrity hashes, so
   the registry cannot change what a build installs. Pinning only the CLI
-  would not do that: `@atbash/cli@0.7.4` asks for `@atbash/sdk@^0.9.0`, and
-  0.9.1 was published after 0.7.4.
-- The image is pinned to `@atbash/sdk@0.9.1`, the current stable SDK, with
-  its glibc native package (`@atbash/sdk-linux-x64-gnu@0.9.1` on amd64). The
+  would not do that: `@atbash/cli@0.7.6` asks for `@atbash/sdk@^0.9.2`, so a
+  later 0.9.x would land in a build with no diff to review.
+- The image is pinned to `@atbash/sdk@0.9.2`, the current stable SDK, with
+  its glibc native package (`@atbash/sdk-linux-x64-gnu@0.9.2` on amd64). The
   Dockerfile's `ATBASH_SDK_VERSION` names it, the build fails if the lock
   installs another SDK version, and `tests/image-supply-chain.sh` checks the
   lock against that arg, so an SDK bump is a visible diff.
@@ -150,7 +152,7 @@ ls -l  ~/.config/atbash/telemetry.json          # -rw------- atbash atbash
 cat /proc/1/status | grep NoNewPrivs            # NoNewPrivs: 1
 capsh --print 2>/dev/null || grep CapEff /proc/self/status   # all dropped
 touch /etc/test 2>&1                            # read-only: should fail
-atbash --version                                # @atbash/cli@0.7.4 (the pin)
+atbash --version                                # @atbash/cli@0.7.6 (the pin)
 docker history atbash-sandbox:local             # no plaintext secrets
 ```
 

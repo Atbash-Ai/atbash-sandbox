@@ -6,11 +6,12 @@
 # Or with docker-compose (recommended — adds read-only FS, cap_drop, etc.):
 #   docker compose run --rm atbash
 
-# Debian (glibc), not Alpine (musl): every published @atbash/sdk-linux-x64-musl
-# (0.8.0 through 0.9.1) is a glibc binary (readelf: NEEDED libc.so.6 and
-# ld-linux-x86-64.so.2, GLIBC_2.34 symbol versions), so on Alpine the CLI
-# cannot load its native SDK and `atbash --version` fails. Stay on glibc until
-# a real musl build is published.
+# Debian (glibc), not Alpine (musl). @atbash/sdk-linux-x64-musl was a glibc
+# binary from 0.8.0 through 0.9.1 (readelf: NEEDED libc.so.6 and
+# ld-linux-x86-64.so.2, GLIBC_2.34 symbol versions), so on Alpine the CLI could
+# not load its native SDK and `atbash --version` failed. Fixed in 0.9.2, which
+# this image pins, so Debian is now a choice for glibc breadth rather than a
+# workaround.
 #
 # Pinned by the multi-platform index digest so a re-pushed tag cannot change
 # the base without a diff. Verified 2026-09-28 with
@@ -22,14 +23,14 @@ FROM node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddf
 # The install below fails the build if the lock resolves any other version, so
 # this arg, docker-compose.yml and the lock cannot drift apart silently. To
 # upgrade: bump cli/package.json, regenerate the lock, bump this line.
-ARG ATBASH_CLI_VERSION=0.7.4
+ARG ATBASH_CLI_VERSION=0.7.6
 
 # The @atbash/sdk version the lock resolves under the CLI, together with its
 # glibc native package (@atbash/sdk-linux-x64-gnu on amd64,
-# @atbash/sdk-linux-arm64-gnu on arm64) at the same version. 0.9.1 is
-# the current stable SDK (SDK PRs #174/#176). The build fails if the lock
+# @atbash/sdk-linux-arm64-gnu on arm64) at the same version. 0.9.2 is
+# the current stable SDK. The build fails if the lock
 # installs anything else, so an SDK bump is a visible diff here too.
-ARG ATBASH_SDK_VERSION=0.9.1
+ARG ATBASH_SDK_VERSION=0.9.2
 
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
     NPM_CONFIG_FUND=false \

@@ -31,7 +31,7 @@ atbash judge '{"action":"list_dir","path":"."}'
 | No host mounts           | No `disk:` section in `render.yaml` — no persistent volume.               |
 | No local secrets         | `render.yaml` declares no env vars at all; the key and org are set in the dashboard's Environment tab, never in the repo. |
 | No public network        | `type: pserv` (private service) — no inbound HTTP.                        |
-| Pinned CLI version       | `ATBASH_CLI_VERSION` build arg in the Dockerfile (currently `0.7.4`).     |
+| Pinned CLI version       | `ATBASH_CLI_VERSION` build arg in the Dockerfile (currently `0.7.6`).     |
 
 ## Teardown
 

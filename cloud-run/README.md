@@ -58,7 +58,7 @@ gcloud run services execute atbash-sandbox --region="$REGION" --command="bash -i
 | Drop capabilities        | `capabilities.drop: [ALL]`.                                               |
 | No privilege escalation  | `allowPrivilegeEscalation: false`.                                        |
 | Internal ingress only    | `run.googleapis.com/ingress: internal` — no public URL.                   |
-| Pinned CLI version       | Docker build arg is `0.7.4`; bump it only in a reviewed change.           |
+| Pinned CLI version       | Docker build arg is `0.7.6`; bump it only in a reviewed change.           |
 
 ## Teardown
 

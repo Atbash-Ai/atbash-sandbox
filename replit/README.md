@@ -28,7 +28,7 @@ atbash judge '{"action":"list_dir","path":"."}'
 | Config permissions 600   | Every **Run** sets `umask 077`, makes `~/.config/atbash` 0700 and chmods any file in it to 0600 (see `.replit` `run`). |
 | No host mounts           | Replit filesystems are per-Repl and isolated by design.                   |
 | No local secrets         | Use Replit **Secrets** (encrypted at rest). Never paste keys into the editor. |
-| Pinned CLI version       | The `run` command installs `@atbash/cli@0.7.4` with `--ignore-scripts`, and only when that exact version is not already installed; bump it in review. |
+| Pinned CLI version       | The `run` command installs `@atbash/cli@0.7.6` with `--ignore-scripts`, and only when that exact version is not already installed; bump it in review. |
 
 ## When NOT to use Replit
 
