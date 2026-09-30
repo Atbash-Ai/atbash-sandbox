@@ -6,12 +6,31 @@
 # Or with docker-compose (recommended — adds read-only FS, cap_drop, etc.):
 #   docker compose run --rm atbash
 
-FROM node:22-alpine
+# Debian (glibc), not Alpine (musl). @atbash/sdk-linux-x64-musl was a glibc
+# binary from 0.8.0 through 0.9.1 (readelf: NEEDED libc.so.6 and
+# ld-linux-x86-64.so.2, GLIBC_2.34 symbol versions), so on Alpine the CLI could
+# not load its native SDK and `atbash --version` failed. Fixed in 0.9.2, which
+# this image pins, so Debian is now a choice for glibc breadth rather than a
+# workaround.
+#
+# Pinned by the multi-platform index digest so a re-pushed tag cannot change
+# the base without a diff. Verified 2026-09-28 with
+# `docker buildx imagetools inspect node:22-bookworm-slim`
+# (linux/amd64 manifest sha256:25330af3531fb5e23318554a0aa911125b6e91b1b777edf7655501d207c067a2).
+FROM node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
 
-# Concrete version, not a floating tag: `latest` resolves to whatever the
-# registry serves at build time, so a hijacked publish would land in every
-# build with no diff to review. Bump this line to upgrade.
-ARG ATBASH_CLI_VERSION=0.5.14
+# The CLI version the committed lockfile (cli/package-lock.json) installs.
+# The install below fails the build if the lock resolves any other version, so
+# this arg, docker-compose.yml and the lock cannot drift apart silently. To
+# upgrade: bump cli/package.json, regenerate the lock, bump this line.
+ARG ATBASH_CLI_VERSION=0.7.6
+
+# The @atbash/sdk version the lock resolves under the CLI, together with its
+# glibc native package (@atbash/sdk-linux-x64-gnu on amd64,
+# @atbash/sdk-linux-arm64-gnu on arm64) at the same version. 0.9.2 is
+# the current stable SDK. The build fails if the lock
+# installs anything else, so an SDK bump is a visible diff here too.
+ARG ATBASH_SDK_VERSION=0.9.2
 
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
     NPM_CONFIG_FUND=false \
@@ -19,24 +38,44 @@ ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
 
 # bash for the opt-in prehook (DEBUG trap is bash-specific);
 # tini for PID-1 signal handling; jq is handy for parsing judge JSON output.
-RUN apk add --no-cache bash tini jq ca-certificates
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends bash tini jq ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
-# Non-root user (reviewer requirement). Explicit UID so platform manifests
+# Non-root user (reviewer requirement). Explicit UID/GID so platform manifests
 # (Cloud Run securityContext, devcontainer runArgs) can reference it.
-RUN adduser -D -u 10001 -h /home/atbash atbash
+RUN groupadd --gid 10001 atbash \
+ && useradd --uid 10001 --gid 10001 --create-home --home-dir /home/atbash \
+            --shell /bin/sh atbash
 
-# Install the CLI globally — pinned version, not @latest. This layer runs as
-# root (USER atbash comes below), so --ignore-scripts matters: without it a
-# preinstall/postinstall from the package or any of its deps gets root code
-# execution in the builder. @atbash/cli ships prebuilt JS and declares no
-# install scripts, so nothing is lost. `atbash --version` proves the bin still
-# links correctly afterwards.
-RUN npm install -g --ignore-scripts "@atbash/cli@${ATBASH_CLI_VERSION}" \
+# Install the CLI from the committed lockfile, not from a version range.
+# `npm install -g @atbash/cli@X` pins only the top package: its @atbash/sdk
+# (^0.9.0) and about 60 transitive packages float to whatever the registry serves at
+# build time. `npm ci` installs exactly the tree in cli/package-lock.json, with
+# every tarball checked against its sha512 integrity hash, and fails if
+# package.json and the lock disagree.
+# This layer runs as root, so --ignore-scripts matters: without it a
+# preinstall/postinstall from any package in the tree gets root code execution
+# in the builder. The CLI and SDK ship prebuilt JS and native binaries and need
+# no install scripts (the lock records hasInstallScript for none of them).
+COPY cli/package.json cli/package-lock.json /opt/atbash/cli/
+WORKDIR /opt/atbash/cli
+RUN npm ci --ignore-scripts --omit=dev \
  && npm cache clean --force \
- && atbash --version
+ && test "$(node -p "require('./node_modules/@atbash/cli/package.json').version")" = "${ATBASH_CLI_VERSION}" \
+ && test "$(node -p "require('./node_modules/@atbash/sdk/package.json').version")" = "${ATBASH_SDK_VERSION}" \
+ && test "$(node -p "require('./node_modules/@atbash/sdk-linux-' + process.arch + '-gnu/package.json').version")" = "${ATBASH_SDK_VERSION}" \
+ && ln -s /opt/atbash/cli/node_modules/.bin/atbash /usr/local/bin/atbash
 
 USER atbash
 WORKDIR /home/atbash
+
+# Smoke check as the runtime user, never as root: `atbash --version` loads the
+# SDK's native binary, and nothing from the registry should execute with root
+# privileges in the builder. The version check above only reads package.json.
+# tests/image-supply-chain.sh fails if any atbash invocation precedes the first
+# `USER atbash`.
+RUN atbash --version
 
 # Config dir for atbash CLI; entrypoint.sh ensures 0700/0600 perms at runtime.
 # When docker-compose mounts this path as tmpfs (read-only root FS pattern),
@@ -44,30 +83,44 @@ WORKDIR /home/atbash
 RUN mkdir -p /home/atbash/.config/atbash \
  && chmod 0700 /home/atbash/.config/atbash
 
+# Everything below is copied as root and stays root-owned: the runtime user
+# must not be able to rewrite the guards it runs under (the entrypoint that
+# re-applies 0700/0600, the prehook that gates its shell) or the tests that
+# check them. Scripts are 0755, everything else 0644, directories 0755.
+# The entrypoint lives in /opt/atbash, not in the atbash-owned home, because a
+# root-owned file in a user-owned directory can still be replaced by renaming.
+USER root
+
 # Telemetry seed — copied into ~/.config/atbash/telemetry.json by entrypoint.sh
 # on every boot. The Atbash SDK only disables telemetry via this file
 # (env vars cannot — see atbash-sdk/src/opentel/telemetry.ts:9).
-COPY --chown=atbash:atbash telemetry/telemetry.json /opt/atbash/telemetry.json
+COPY telemetry/telemetry.json /opt/atbash/telemetry.json
 
 # Friendly entrypoint that auto-generates an agent keypair on first run
 # (so users can onboard at atbash.ai without copy-pasting a key around).
-COPY --chown=atbash:atbash entrypoint.sh /home/atbash/entrypoint.sh
+COPY entrypoint.sh /opt/atbash/entrypoint.sh
 
 # Smoke test suite — single-file demo run via ./test-suite.sh after onboarding.
-COPY --chown=atbash:atbash test-suite.sh /home/atbash/test-suite.sh
+COPY test-suite.sh /home/atbash/test-suite.sh
 
 # Detailed multi-suite tests (5 verdicts + 4 supply-chain categories) at
 # /opt/atbash/tests for users who want a more thorough run.
-COPY --chown=atbash:atbash tests/ /opt/atbash/tests/
+COPY tests/ /opt/atbash/tests/
 
 # Opt-in shell-level prehook demonstration (DEBUG trap pattern).
-COPY --chown=atbash:atbash prehook/ /opt/atbash/prehook/
+COPY prehook/ /opt/atbash/prehook/
 
-USER root
-RUN chmod 0755 /home/atbash/entrypoint.sh /home/atbash/test-suite.sh \
+# COPY keeps the build context's modes, which differ between Linux and
+# Windows clients, so set every mode explicitly.
+RUN chown -R root:root /opt/atbash/telemetry.json /opt/atbash/entrypoint.sh \
+                       /home/atbash/test-suite.sh /opt/atbash/tests /opt/atbash/prehook \
+ && find /opt/atbash/tests /opt/atbash/prehook -type d -exec chmod 0755 {} + \
+ && find /opt/atbash/tests /opt/atbash/prehook -type f -exec chmod 0644 {} + \
+ && chmod 0644 /opt/atbash/telemetry.json \
+ && chmod 0755 /opt/atbash /opt/atbash/entrypoint.sh /home/atbash/test-suite.sh \
                /opt/atbash/tests/*.sh /opt/atbash/tests/supply-chain/*.sh \
                /opt/atbash/prehook/*.sh
 USER atbash
 
-ENTRYPOINT ["/sbin/tini", "--", "/home/atbash/entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/opt/atbash/entrypoint.sh"]
 CMD ["sh"]

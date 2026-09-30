@@ -91,9 +91,10 @@ off by default.
 
 ## How to test safely
 
-1. **Your laptop's files are out of reach.** No template mounts a host
-   path. `docker-compose.yml` has no `volumes:`; `fly.toml` has no
-   `[mounts]`; the devcontainer uses an anonymous volume.
+1. **Your laptop's files are out of reach.** No hardened template mounts
+   a host path. `docker-compose.yml` has no `volumes:`; `fly.toml` has no
+   `[mounts]`. The devcontainer is the exception: it mounts your checkout,
+   so use Compose for untrusted payloads.
 2. **The agent key never leaves the container.** The entrypoint runs
    `atbash keygen` inside the sandbox — the private key lives in
    `~/.config/atbash/config.json` (mode 0600) on tmpfs and dies with the
@@ -124,7 +125,7 @@ Deeper: [`docs/how-to-test-safely.md`](docs/how-to-test-safely.md).
 | `no-new-privileges`                     | docker-compose.yml + Cloud Run |
 | `~/.config/atbash/*.json` mode 0600     | entrypoint.sh on every boot |
 | Secrets via platform store only         | every platform README |
-| `@atbash/cli@latest` by default          | Dockerfile `ARG ATBASH_CLI_VERSION` (pin with `--build-arg`) |
+| `@atbash/cli@0.7.6` by default           | Dockerfile `ARG ATBASH_CLI_VERSION` (change only in a reviewed update) |
 
 Full breakdown and how to verify it: [`docs/security-posture.md`](docs/security-posture.md).
 

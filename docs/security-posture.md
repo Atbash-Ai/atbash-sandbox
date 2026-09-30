@@ -20,15 +20,24 @@ version), defending against a malicious cloud provider.
 ### Process identity
 
 - Container runs as UID/GID **10001**, not root.
-- Implemented in the Dockerfile via `adduser -D -u 10001 -h /home/atbash atbash` +
+- Implemented in the Dockerfile via `groupadd --gid 10001 atbash` +
+  `useradd --uid 10001 --gid 10001 --create-home --home-dir /home/atbash atbash` +
   `USER atbash`.
 - Enforced platform-by-platform:
   - Cloud Run: `securityContext.runAsNonRoot: true`, `runAsUser: 10001`.
-  - Devcontainer: `"remoteUser": "atbash"`, `"containerUser": "atbash"`.
+  - Devcontainer: not enforced. `.devcontainer/devcontainer.json` uses
+    Microsoft's `javascript-node` base and its default user; it is a
+    dev-loop convenience, not a hardened target (see its header comment).
   - Docker Compose: inherits `USER` from the image.
   - Fly.io, Render: inherit `USER` from the image; platform has no override.
   - Replit: caveat — Replit's `runner` user is not root but is not
     container-level enforced. See `replit/README.md`.
+- The runtime user does not own its guards. `/opt/atbash/entrypoint.sh`
+  (which re-applies the 0700/0600 modes and runs under `tini`), the prehook
+  in `/opt/atbash/prehook/`, the tests and the telemetry seed are root-owned,
+  scripts `0755` and other files `0644`, so uid 10001 cannot rewrite them.
+  The entrypoint sits in `/opt/atbash` rather than the atbash-owned home,
+  where a root-owned file could still be replaced by renaming it.
 
 ### Filesystem
 
@@ -36,15 +45,18 @@ version), defending against a malicious cloud provider.
   Compose `read_only: true`, Cloud Run `readOnlyRootFilesystem: true`).
 - **Writable scratch space** via `tmpfs` for `/tmp` and the atbash cache
   dir. Tmpfs evaporates on container stop.
-- **No host bind mounts**. The closest exception is the devcontainer's
-  `workspaceMount`, which is an anonymous Docker volume — not a host path.
+- **No host bind mounts** in the hardened targets. The exception is the
+  devcontainer, which uses the dev-containers default workspace mount: your
+  checkout, bind-mounted when run locally in VS Code (a cloned repo in
+  Codespaces). Use Compose for untrusted payloads.
 - **No persistent volumes**. None of the platform manifests provision disks.
 
 ### Permissions on the atbash config
 
 - `~/.config/atbash/` is mode `0700`.
-- `~/.config/atbash/telemetry.json` is mode `0600`, created at image build
-  time.
+- `~/.config/atbash/telemetry.json` is mode `0600`, copied by
+  `entrypoint.sh` on every boot from the root-owned seed
+  `/opt/atbash/telemetry.json`.
 - The CLI's `atbash keygen` produces `~/.config/atbash/config.json` mode
   `0600`; documented in the SDK as a requirement (`atbash-sdk/src/opentel/telemetry.ts:7-9`).
 
@@ -58,18 +70,19 @@ version), defending against a malicious cloud provider.
 - If you prefer to provide your own key, each platform's secret store
   injects `ATBASH_AGENT_KEY` (and `ATBASH_ORG_NAME`) at runtime:
   - Fly.io → `fly secrets set`
-  - Render → Environment (`sync: false`)
-  - Devcontainer → Codespaces Secrets / VS Code remote env
+  - Render → the service's Environment tab (`render.yaml` declares none)
+  - Devcontainer → Codespaces Secrets / your local env, passed through
+    `remoteEnv` only, so the key is not written into the container config
+    that `docker inspect` shows
   - Replit → Secrets panel
   - Cloud Run → Secret Manager (`secretKeyRef`)
 - `.env` (used by `docker compose run --rm atbash`) is `.gitignore`d.
 
 ### Linux capabilities & privilege escalation
 
-- `cap_drop: [ALL]` (Docker Compose, Devcontainer `runArgs`, Cloud Run
+- `cap_drop: [ALL]` (Docker Compose, Cloud Run
   `capabilities.drop: [ALL]`).
-- `security_opt: ["no-new-privileges:true"]` on Docker Compose and the
-  devcontainer `runArgs`.
+- `security_opt: ["no-new-privileges:true"]` on Docker Compose.
 - Cloud Run: `allowPrivilegeEscalation: false`.
 
 ### Network
@@ -82,19 +95,50 @@ version), defending against a malicious cloud provider.
 
 ### Supply chain
 
-- The base image is `node:22-alpine`, an Alpine-based image pinned to
-  Node 22 and refreshed by upstream.
-- The atbash CLI is pinned to `@atbash/cli@0.5.14` via the
-  `ATBASH_CLI_VERSION` build arg, and `docker-compose.yml` passes the same
-  version. Bumps are intentional, not implicit: changing the version is a
-  one-line diff a reviewer can see.
-- The global install runs `--ignore-scripts`. It happens before `USER atbash`,
-  so a package lifecycle script would otherwise execute as root in the builder.
-- `npm install` is run with `--no-audit --no-fund --no-update-notifier` to
-  avoid noisy egress at build time. Audit is run separately if desired
-  (`npm audit --omit=dev` inside the container).
-- No third-party shell scripts are piped from `curl`. The Dockerfile's
-  `apk add` packages are the only network reach during build.
+- The base image is `node:22-bookworm-slim` (Debian 12, glibc) pinned by its
+  multi-platform index digest in the `FROM` line, so a re-pushed tag cannot
+  change the base without a reviewed diff. Refreshing the base means updating
+  that digest.
+- Not Alpine: `@atbash/sdk-linux-x64-musl` was a glibc binary from 0.8.0
+  through 0.9.1 (`readelf -d` listed `libc.so.6` and `ld-linux-x86-64.so.2`),
+  so the CLI could not load its native SDK on musl and `atbash --version`
+  failed. Fixed in 0.9.2, which this image pins. Debian is kept for glibc
+  breadth rather than because musl is broken; moving to Alpine is now a size
+  decision, not a blocked one.
+- `tini` comes from Debian at `/usr/bin/tini` and runs as PID 1 in front of
+  `entrypoint.sh`.
+- The atbash CLI is `@atbash/cli@0.7.6`, installed with `npm ci` from the
+  committed `cli/package.json` + `cli/package-lock.json`. The lock pins the
+  whole tree (the CLI, `@atbash/sdk`, its native platform packages and every
+  transitive dependency) to exact versions with sha512 integrity hashes, so
+  the registry cannot change what a build installs. Pinning only the CLI
+  would not do that: `@atbash/cli@0.7.6` asks for `@atbash/sdk@^0.9.2`, so a
+  later 0.9.x would land in a build with no diff to review.
+- The image is pinned to `@atbash/sdk@0.9.2`, the current stable SDK, with
+  its glibc native package (`@atbash/sdk-linux-x64-gnu@0.9.2` on amd64). The
+  Dockerfile's `ATBASH_SDK_VERSION` names it, the build fails if the lock
+  installs another SDK version, and `tests/image-supply-chain.sh` checks the
+  lock against that arg, so an SDK bump is a visible diff.
+- Bumps are intentional only because of the lock: an upgrade is a reviewed
+  diff to `cli/package.json`, `cli/package-lock.json`, the Dockerfile's
+  `ATBASH_CLI_VERSION` and `docker-compose.yml`. The build fails if the arg
+  and the locked CLI version disagree, and `tests/image-supply-chain.sh`
+  checks all four agree and that every locked package has an integrity hash.
+  Regenerate the lock inside the pinned base image with
+  `npm install --package-lock-only --ignore-scripts` in `cli/`.
+- The install runs `--ignore-scripts`. It happens before `USER atbash`, so a
+  package lifecycle script would otherwise execute as root in the builder.
+- Nothing from the registry executes as root at build time. The root layer
+  only checks the locked version by reading `package.json`; the
+  `atbash --version` smoke check runs after `USER atbash`, as uid 10001.
+- The upstream fix is for `@atbash/cli` to publish an `npm-shrinkwrap.json`,
+  so every consumer (not only this image) gets the locked tree.
+- `NPM_CONFIG_AUDIT`, `NPM_CONFIG_FUND` and `NPM_CONFIG_UPDATE_NOTIFIER` are
+  off to avoid noisy egress at build time. Audit is run separately if
+  desired (`npm audit --omit=dev` in `/opt/atbash/cli`).
+- No third-party shell scripts are piped from `curl`. The Debian package
+  install (`apt-get install --no-install-recommends`) and the locked npm
+  install are the only network reach during build.
 
 ## Verifying the posture for yourself
 
@@ -108,7 +152,7 @@ ls -l  ~/.config/atbash/telemetry.json          # -rw------- atbash atbash
 cat /proc/1/status | grep NoNewPrivs            # NoNewPrivs: 1
 capsh --print 2>/dev/null || grep CapEff /proc/self/status   # all dropped
 touch /etc/test 2>&1                            # read-only: should fail
-atbash --version                                # @atbash/cli@0.5.14 (the pin)
+atbash --version                                # @atbash/cli@0.7.6 (the pin)
 docker history atbash-sandbox:local             # no plaintext secrets
 ```
 

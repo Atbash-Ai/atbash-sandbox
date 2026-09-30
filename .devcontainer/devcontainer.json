@@ -16,10 +16,10 @@
   // as the Dockerfile.
   "image": "mcr.microsoft.com/devcontainers/javascript-node:22-bookworm",
 
-  "containerEnv": {
-    "ATBASH_AGENT_KEY": "${localEnv:ATBASH_AGENT_KEY}",
-    "ATBASH_ORG_NAME":  "${localEnv:ATBASH_ORG_NAME}"
-  },
+  // remoteEnv only, not containerEnv: containerEnv is written into the
+  // container's config, where `docker inspect` (and anything else that can
+  // read the Docker API) shows the agent key in plain text. remoteEnv is
+  // applied to the VS Code server and its terminals instead.
   "remoteEnv": {
     "ATBASH_AGENT_KEY": "${localEnv:ATBASH_AGENT_KEY}",
     "ATBASH_ORG_NAME":  "${localEnv:ATBASH_ORG_NAME}"
@@ -27,7 +27,7 @@
 
   // Install the CLI, seed the telemetry opt-out file, and verify the version
   // matches the pin. Runs once after the container is created.
-  "postCreateCommand": "sudo npm install -g @atbash/cli@latest && mkdir -p $HOME/.config/atbash && cp ${containerWorkspaceFolder}/telemetry/telemetry.json $HOME/.config/atbash/telemetry.json && chmod 0700 $HOME/.config/atbash && chmod 0600 $HOME/.config/atbash/telemetry.json && atbash --version",
+  "postCreateCommand": "sudo npm install -g --ignore-scripts @atbash/cli@0.7.6 && mkdir -p $HOME/.config/atbash && cp ${containerWorkspaceFolder}/telemetry/telemetry.json $HOME/.config/atbash/telemetry.json && chmod 0700 $HOME/.config/atbash && chmod 0600 $HOME/.config/atbash/telemetry.json && atbash --version",
 
   "postAttachCommand": "echo 'Atbash sandbox ready. Detailed tests at tests/run-all.sh, smoke test at ./test-suite.sh. Set ATBASH_AGENT_KEY and ATBASH_ORG_NAME before running.'"
 }

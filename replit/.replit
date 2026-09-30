@@ -1,4 +1,4 @@
-run = "bash -lc 'npm install -g @atbash/cli@latest && atbash --version && bash -i'"
+run = "bash -lc '{ npm ls -g @atbash/cli@0.7.6 >/dev/null 2>&1 || npm install -g --ignore-scripts @atbash/cli@0.7.6; } && umask 077 && mkdir -p ~/.config/atbash && chmod 700 ~/.config/atbash && find ~/.config/atbash -type f -exec chmod 600 {} + && atbash --version && bash -i'"
 entrypoint = "README.md"
 
 [nix]
