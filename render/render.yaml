@@ -1,0 +1,14 @@
+# Render blueprint for the Atbash sandbox.
+#
+# This is a private background worker — no public URL. After the first deploy,
+# attach an SSH session via the Render dashboard ("Shell" tab).
+#
+# Spec: https://render.com/docs/blueprint-spec
+
+services:
+  - type: pserv
+    name: atbash-sandbox
+    runtime: docker
+    dockerfilePath: ../Dockerfile
+    plan: free
+    autoDeploy: false
