@@ -26,7 +26,7 @@ docker compose run --rm atbash
 ./test-suite.sh
 
 # 4. Or run the detailed suite (5 verdict tests + 4 supply-chain suites):
-bash /opt/atbash/tests/run-all.sh
+bash /opt/atbash/scenarios/run-all.sh
 ```
 
 If you already have an agent key, drop it in `.env` (`cp .env.example .env`)
@@ -83,7 +83,7 @@ Gate every shell command through `atbash judge` before bash runs it:
 source /opt/atbash/prehook/install-prehook.sh
 ls                                 # ALLOW → runs
 rm -rf /                           # BLOCK → trap stops it
-trap - DEBUG                       # disable
+exit                               # leave (trap - DEBUG is itself judged)
 ```
 
 See [`prehook/README.md`](prehook/README.md) for the pattern and why it's
@@ -91,9 +91,10 @@ off by default.
 
 ## How to test safely
 
-1. **Your laptop's files are out of reach.** No template mounts a host
-   path. `docker-compose.yml` has no `volumes:`; `fly.toml` has no
-   `[mounts]`; the devcontainer uses an anonymous volume.
+1. **Your laptop's files are out of reach.** No hardened template mounts
+   a host path. `docker-compose.yml` has no `volumes:`; `fly.toml` has no
+   `[mounts]`. The devcontainer is the exception: it mounts your checkout,
+   so use Compose for untrusted payloads.
 2. **The agent key never leaves the container.** The entrypoint runs
    `atbash keygen` inside the sandbox — the private key lives in
    `~/.config/atbash/config.json` (mode 0600) on tmpfs and dies with the
@@ -124,7 +125,7 @@ Deeper: [`docs/how-to-test-safely.md`](docs/how-to-test-safely.md).
 | `no-new-privileges`                     | docker-compose.yml + Cloud Run |
 | `~/.config/atbash/*.json` mode 0600     | entrypoint.sh on every boot |
 | Secrets via platform store only         | every platform README |
-| `@atbash/cli@latest` by default          | Dockerfile `ARG ATBASH_CLI_VERSION` (pin with `--build-arg`) |
+| `@atbash/cli@0.7.6` by default           | Dockerfile `ARG ATBASH_CLI_VERSION` (change only in a reviewed update) |
 
 Full breakdown and how to verify it: [`docs/security-posture.md`](docs/security-posture.md).
 
@@ -133,7 +134,7 @@ Full breakdown and how to verify it: [`docs/security-posture.md`](docs/security-
 Iteration 1 ships the Docker base + five cloud platform manifests
 (Codespaces / Devcontainer, Render, Fly.io, Replit, Google Cloud Run), an
 opt-in shell prehook, a smoke test suite (`test-suite.sh`), and a detailed
-multi-suite runner (`tests/run-all.sh`). Out of scope for now: an HTTP
+multi-suite runner (`scenarios/run-all.sh`). Out of scope for now: an HTTP
 wrapper around the CLI, a multi-agent sandbox, CI that auto-bumps the
 pinned CLI version, a built-in CLI prehook (this repo demos the *pattern*
 via shell, not a CLI feature), and platforms whose free tier we can't

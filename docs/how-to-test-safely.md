@@ -45,7 +45,7 @@ not affect what the judge or the immutable audit log do with your queries.**
 4. Run the full suite:
 
    ```bash
-   bash /opt/atbash/tests/run-all.sh
+   bash /opt/atbash/scenarios/run-all.sh
    ```
 
 5. (Optional) try the prehook demo:
@@ -66,9 +66,11 @@ not affect what the judge or the immutable audit log do with your queries.**
 ### Can the sandbox read files off my laptop?
 
 No. None of the templates mount a host path. `docker-compose.yml` has no
-`volumes:` block; `fly.toml` has no `[mounts]`; the devcontainer config
-sets `workspaceMount` to a fresh anonymous volume; cloud runtimes don't
-allow host mounts at all.
+`volumes:` block; `fly.toml` has no `[mounts]`; cloud runtimes don't
+allow host mounts at all. The exception is the devcontainer: it uses the
+default workspace mount, which bind-mounts your checkout when run locally in
+VS Code. It is a dev-loop convenience, not a hardened target; use Compose
+for untrusted payloads.
 
 ### What about the agent key — is it in the image?
 
@@ -101,9 +103,10 @@ the change to take effect.
 ### Can the prehook block me out of my own shell?
 
 It can, if you enable it and try a command the policy blocks. To recover,
-exit the shell and re-attach without sourcing the install script. Or use a
-new shell on the same container (`bash --noprofile --norc`) and run
-`trap - DEBUG`.
+exit the shell and re-attach without sourcing the install script, or open a
+new shell on the same container (`bash --noprofile --norc`) - the hook lives
+only in the shell that sourced it. (`trap - DEBUG` inside the hooked shell is
+itself judged.)
 
 ### What if I want to test against my own organization without affecting it?
 

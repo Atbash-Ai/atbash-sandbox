@@ -17,3 +17,6 @@ build/
 .atbash/
 *-config.json
 !telemetry/telemetry.json
+
+# Local scratch (PR body drafts, reports) - never committed.
+.tmp/

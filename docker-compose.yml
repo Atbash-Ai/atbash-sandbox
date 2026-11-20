@@ -22,7 +22,9 @@ services:
     build:
       context: .
       args:
-        ATBASH_CLI_VERSION: "latest"
+        # Must match the Dockerfile's ARG default — a floating tag here would
+        # silently undo the pin. A CI supply-chain check compares both.
+        ATBASH_CLI_VERSION: "0.7.6"
     image: atbash-sandbox:local
     stdin_open: true
     tty: true

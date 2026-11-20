@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Run the full sandbox test suite. Exits non-zero if any test fails.
+# Run every live-judge scenario. Exits non-zero if any scenario fails.
 #
 # Usage (inside the sandbox container):
-#   bash /opt/atbash/tests/run-all.sh
+#   bash /opt/atbash/scenarios/run-all.sh
 #
 # Each sub-suite prints its own PASS/FAIL lines and returns 0 on success.
 #
